@@ -59,19 +59,23 @@ exports.createJob = async (req, res) => {
   }
 };
 
-// 2. Get All Active Jobs (Strictly returns ONLY the 10 most recent jobs)
+// 2. Get All Active Jobs (Strictly returns 10 unique recent jobs)
 exports.getAllJobs = async (req, res) => {
   try {
     const rawJobs = await Job.find({})
       .sort({ createdAt: -1 })
-      .limit(10)
+      .limit(30)
       .lean();
 
-    // Attach resolved company name and safe structure
-    const jobs = await Promise.all(
-      rawJobs.map(async (j) => {
-        let compName = j.companyName;
+    const uniqueMap = new Map();
+    const jobs = [];
 
+    for (const j of rawJobs) {
+      const titleKey = (j.title || '').trim().toLowerCase();
+      if (!uniqueMap.has(titleKey)) {
+        uniqueMap.set(titleKey, true);
+
+        let compName = j.companyName;
         if (!compName && j.company) {
           if (Company) {
             const compDoc = await Company.findById(j.company).lean();
@@ -88,7 +92,7 @@ exports.getAllJobs = async (req, res) => {
           if (userDoc) compName = userDoc.companyName || userDoc.name;
         }
 
-        return {
+        jobs.push({
           ...j,
           companyName: compName || 'Top Tech Company',
           company: {
@@ -96,9 +100,10 @@ exports.getAllJobs = async (req, res) => {
             companyName: compName || 'Top Tech Company',
             name: compName || 'Top Tech Company',
           },
-        };
-      })
-    );
+        });
+      }
+      if (jobs.length >= 10) break;
+    }
 
     res.json(jobs);
   } catch (error) {
@@ -154,22 +159,48 @@ exports.deleteJob = async (req, res) => {
   }
 };
 
-// 6. Get Jobs Posted by Current Company
+// 6. Get Jobs Posted by Current Company (Matches by ID, Company profile, and Company Name)
 exports.getCompanyJobs = async (req, res) => {
   try {
     const userId = req.user._id || req.user.id;
+    const companyProfileId = req.user.companyId || req.user.company;
+    const userOrgName = (req.user.companyName || req.user.name || '').replace(/recruiter/i, '').trim();
 
-    const jobs = await Job.find({
-      $or: [
-        { user: userId },
-        { createdBy: userId },
-        { company: userId },
-        { companyId: userId },
-      ],
-    }).sort({ createdAt: -1 });
+    const queryFilters = [
+      { user: userId },
+      { createdBy: userId },
+      { company: userId },
+      { companyId: userId },
+    ];
+
+    if (companyProfileId) {
+      queryFilters.push({ company: companyProfileId });
+      queryFilters.push({ companyId: companyProfileId });
+    }
+
+    // Agar seed data company name ke through set tha (jaise "Amazon")
+    if (userOrgName) {
+      queryFilters.push({
+        companyName: { $regex: new RegExp(userOrgName, 'i') }
+      });
+    }
+
+    // Company model se match check karo agar profile alag ID par ho
+    if (Company) {
+      const compDoc = await Company.findOne({
+        $or: [{ user: userId }, { name: { $regex: new RegExp(userOrgName, 'i') } }]
+      });
+      if (compDoc) {
+        queryFilters.push({ company: compDoc._id });
+        queryFilters.push({ companyId: compDoc._id });
+      }
+    }
+
+    const jobs = await Job.find({ $or: queryFilters }).sort({ createdAt: -1 });
 
     res.json(jobs);
   } catch (error) {
+    console.error('Get company jobs error:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -192,7 +223,6 @@ exports.applyForJob = async (req, res) => {
       return res.status(404).json({ message: 'Job not found' });
     }
 
-    // Check if already applied
     const existingApplication = await Application.findOne({
       job: jobId,
       $or: [
@@ -204,7 +234,6 @@ exports.applyForJob = async (req, res) => {
       return res.status(400).json({ message: 'Already applied for this job' });
     }
 
-    // 1. Create Application
     const application = await Application.create({
       job: jobId,
       student: studentId,
@@ -212,7 +241,6 @@ exports.applyForJob = async (req, res) => {
       appliedAt: new Date(),
     });
 
-    // 2. Identify Recruiter User ID
     let recruiterUserId = null;
     if (job.createdBy) {
       recruiterUserId = job.createdBy;
@@ -224,7 +252,6 @@ exports.applyForJob = async (req, res) => {
 
     const applicantName = req.user.name || 'A student';
 
-    // 3. Notification for Company/Recruiter
     if (recruiterUserId) {
       try {
         await Notification.create({
@@ -243,7 +270,6 @@ exports.applyForJob = async (req, res) => {
       }
     }
 
-    // 4. Notification for Student
     try {
       await Notification.create({
         recipient: req.user._id || req.user.id,
