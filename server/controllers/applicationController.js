@@ -1,8 +1,9 @@
 const Notification = require('../models/Notification');
 const Application = require('../models/Application');
 const Interview = require('../models/Interview');
+const Job = require('../models/Job');
 
-// Helper function: Notification create karne ke liye
+// Helper function: Student ke status updates ke liye
 const createStatusNotification = async (application, status, details = {}) => {
   try {
     const recipientId = application.student?.user || application.student?._id || application.student;
@@ -31,36 +32,80 @@ const createStatusNotification = async (application, status, details = {}) => {
 
     await Notification.create({
       recipient: recipientId,
+      user: recipientId, // Fallback if schema uses 'user' instead of 'recipient'
       title,
       message,
+      type: 'status_update',
+      isRead: false,
+      createdAt: new Date(),
     });
   } catch (err) {
-    console.error('Notification trigger error:', err);
+    console.error('Student notification error:', err);
   }
 };
 
-// 1. Student Job Apply Controller (Agar isi file me apply function hai)
+// 1. Student Job Apply Controller
 const applyForJob = async (req, res) => {
   try {
     const { jobId, resume } = req.body;
-    const studentId = req.user.studentId || req.user.id;
+    const studentId = req.user.studentId || req.user.id || req.user._id;
 
     const application = await Application.create({
       job: jobId,
       student: studentId,
       resume,
-      status: 'Applied'
+      status: 'Applied',
     });
 
+    // Populate student and job details (including company profile and creator)
     const populatedApp = await Application.findById(application._id)
       .populate('student')
-      .populate('job');
+      .populate({
+        path: 'job',
+        populate: { path: 'company' },
+      });
 
-    // Applied notification trigger
+    // A. Student ko confirmation notification
     await createStatusNotification(populatedApp, 'Applied');
+
+    // B. Company / Recruiter ko "New Applicant" Notification
+    try {
+      const job = populatedApp.job;
+      const applicantName = req.user.name || populatedApp.student?.name || 'A candidate';
+      const jobTitle = job?.title || 'Job Opening';
+
+      // Recruiter ka User ID dhoondo
+      let companyRecipientId = null;
+      if (job?.createdBy) {
+        companyRecipientId = job.createdBy;
+      } else if (job?.user) {
+        companyRecipientId = job.user;
+      } else if (job?.company?.user) {
+        companyRecipientId = job.company.user;
+      } else if (job?.company) {
+        companyRecipientId = job.company._id || job.company;
+      }
+
+      if (companyRecipientId) {
+        await Notification.create({
+          recipient: companyRecipientId,
+          user: companyRecipientId, // Dono match karo taaki controller kisi bhi field se find kare to mil jaye
+          title: 'New Applicant Received! 🎯',
+          message: `${applicantName} has applied for "${jobTitle}".`,
+          type: 'application',
+          link: '/company/applicants',
+          isRead: false,
+          createdAt: new Date(),
+        });
+        console.log(`🔔 Notification sent to Company/Recruiter: ${companyRecipientId}`);
+      }
+    } catch (notifErr) {
+      console.error('Company notification trigger error:', notifErr);
+    }
 
     res.status(201).json(application);
   } catch (error) {
+    console.error('Apply job error:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -82,7 +127,7 @@ const updateApplicationStatus = async (req, res) => {
     application.status = status;
     await application.save();
 
-    // Trigger Notification based on new status
+    // Trigger Notification to Student based on new status
     await createStatusNotification(application, status);
 
     res.json({ message: 'Status updated successfully', application });
@@ -105,7 +150,7 @@ const scheduleInterview = async (req, res) => {
     }
 
     const studentUserId = application.student?.user || application.student?._id;
-    const companyId = application.job?.company;
+    const companyId = application.job?.company?._id || application.job?.company;
 
     const interview = await Interview.create({
       application: applicationId,
@@ -118,7 +163,7 @@ const scheduleInterview = async (req, res) => {
 
     await Application.findByIdAndUpdate(applicationId, { status: 'Interview' });
 
-    // Trigger Interview Notification
+    // Trigger Interview Notification to Student
     await createStatusNotification(application, 'Interview', { scheduledAt, mode, link });
 
     res.status(201).json(interview);
@@ -140,9 +185,9 @@ const getMyInterviews = async (req, res) => {
   }
 };
 
-module.exports = { 
+module.exports = {
   applyForJob,
-  updateApplicationStatus, 
-  scheduleInterview, 
-  getMyInterviews 
+  updateApplicationStatus,
+  scheduleInterview,
+  getMyInterviews,
 };
