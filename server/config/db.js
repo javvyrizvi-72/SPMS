@@ -189,7 +189,7 @@ const TEN_JOBS = {
 
 const setupClean5Companies10Jobs = async () => {
   try {
-    // 1. Wipe non-admin users, existing company profiles, aur jobs
+    // 1. Wipe non-admin users, company profiles, and existing jobs
     await User.deleteMany({ role: { $ne: 'admin' } });
     if (Company) {
       await Company.deleteMany({});
@@ -214,16 +214,17 @@ const setupClean5Companies10Jobs = async () => {
       await admin.save();
     }
 
-    // 3. Create exactly 5 Companies in User Model AND Company Model
-    const companyMap = {};
+    // 3. Create Companies and store both User ID and Company Profile ID
+    const companyLookup = {};
+
     for (const cData of COMPANIES_DATA) {
       const companyUser = new User(cData);
       await companyUser.save();
-      companyMap[cData.companyName] = companyUser;
 
-      // Agar alag se Company profile model exist karta hai toh document insert karo
+      let companyDocId = companyUser._id;
+
       if (Company) {
-        await Company.create({
+        const compDoc = await Company.create({
           user: companyUser._id,
           name: cData.companyName,
           companyName: cData.companyName,
@@ -234,8 +235,9 @@ const setupClean5Companies10Jobs = async () => {
           isApproved: true,
           status: 'approved',
         });
+        companyDocId = compDoc._id;
       } else if (mongoose.connection.collections['companies']) {
-        await mongoose.connection.collections['companies'].insertOne({
+        const insertRes = await mongoose.connection.collections['companies'].insertOne({
           user: companyUser._id,
           name: cData.companyName,
           companyName: cData.companyName,
@@ -248,12 +250,18 @@ const setupClean5Companies10Jobs = async () => {
           createdAt: new Date(),
           updatedAt: new Date(),
         });
+        companyDocId = insertRes.insertedId;
       }
+
+      companyLookup[cData.companyName] = {
+        userId: companyUser._id,
+        companyDocId: companyDocId,
+      };
     }
 
-    // 4. Exactly 10 Jobs Create Karo
+    // 4. Create Jobs with cross-linked IDs (Maps to both User ID and Company Model ID)
     for (const [cName, jobs] of Object.entries(TEN_JOBS)) {
-      const cUser = companyMap[cName];
+      const info = companyLookup[cName];
       for (const j of jobs) {
         await Job.create({
           title: j.title,
@@ -269,7 +277,11 @@ const setupClean5Companies10Jobs = async () => {
           minCgpa: j.minCgpa,
           requiredDegree: j.requiredDegree,
           branch: j.branches.join(', '),
-          company: cUser._id,
+          // Dono fields pass karo taaki chahe controller user._id dhoonde ya company._id, match ho jaye:
+          company: info.companyDocId,
+          companyId: info.companyDocId,
+          createdBy: info.userId,
+          user: info.userId,
           companyName: cName,
           status: 'Active',
           deadline: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000),
@@ -277,7 +289,7 @@ const setupClean5Companies10Jobs = async () => {
       }
     }
 
-    console.log('🎯 POPULATED BOTH MODELS: Exactly 5 Companies and 10 Jobs live.');
+    console.log('🎯 DUAL LINKING COMPLETE: Jobs now correctly linked to Company Profiles!');
   } catch (err) {
     console.error('❌ Sync error:', err.message);
   }
