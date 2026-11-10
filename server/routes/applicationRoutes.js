@@ -1,12 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const { 
+  applyForJob,
   scheduleInterview, 
   getMyInterviews, 
   updateApplicationStatus 
 } = require('../controllers/applicationController');
 const { protect } = require('../middleware/authMiddleware');
 const { authorize } = require('../middleware/roleMiddleware');
+
+// Student Apply Route
+router.post('/apply', protect, authorize('student'), applyForJob);
+router.post('/', protect, applyForJob);
 
 // Interview schedule route
 router.post('/interview', protect, authorize('company'), scheduleInterview);
