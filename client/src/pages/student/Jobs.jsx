@@ -18,7 +18,6 @@ const Jobs = () => {
     const fetch = async () => {
       try {
         const response = await getAllJobs()
-        // Extract array whether backend returns [ ... ] or { jobs: [ ... ] } or { data: [ ... ] }
         const rawData = response?.data
         let jobsList = []
 
@@ -32,8 +31,21 @@ const Jobs = () => {
           jobsList = response
         }
 
-        setJobs(jobsList)
-        setFiltered(jobsList)
+        // Title ke base par duplicate remove karo aur sirf latest 10 jobs lo
+        const uniqueJobsMap = new Map()
+        jobsList.forEach(item => {
+          const key = (item.title || '').trim().toLowerCase()
+          if (key && !uniqueJobsMap.has(key)) {
+            uniqueJobsMap.set(key, item)
+          } else if (!key) {
+            uniqueJobsMap.set(item._id, item)
+          }
+        })
+
+        const cleanLatest10 = Array.from(uniqueJobsMap.values()).slice(0, 10)
+
+        setJobs(cleanLatest10)
+        setFiltered(cleanLatest10)
       } catch (err) {
         console.error('Failed to load jobs:', err)
         toast.error('Failed to load jobs')
