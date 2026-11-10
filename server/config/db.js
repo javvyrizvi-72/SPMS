@@ -1,271 +1,53 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
-const Job = require('../models/Job');
 
-const PERMANENT_USERS = [
-  {
-    name: 'Super Admin',
-    email: 'admin@placeme.demo',
-    password: 'Admin@123Password',
-    role: 'admin',
-    isApproved: true,
-    status: 'approved',
-    approvalStatus: 'approved',
-  },
-  {
-    name: 'Demo Student',
-    email: 'student@placeme.demo',
-    password: 'password123',
-    role: 'student',
-    isApproved: true,
-    status: 'approved',
-    approvalStatus: 'approved',
-  },
-  {
-    name: 'TechCorp Recruiter',
-    email: 'hr@techcorp.demo',
-    password: 'password123',
-    role: 'company',
-    companyName: 'TechCorp Solutions',
-    website: 'https://techcorp.demo',
-    isApproved: true,
-    status: 'approved',
-    approvalStatus: 'approved',
-  },
-  {
-    name: 'CodeCraft Recruiter',
-    email: 'hr@codecraft.demo',
-    password: 'password123',
-    role: 'company',
-    companyName: 'CodeCraft Solutions',
-    website: 'https://codecraft.demo',
-    isApproved: true,
-    status: 'approved',
-    approvalStatus: 'approved',
-  },
-  {
-    name: 'InnovateLabs Recruiter',
-    email: 'hr@innovatelabs.demo',
-    password: 'password123',
-    role: 'company',
-    companyName: 'InnovateLabs',
-    website: 'https://innovatelabs.demo',
-    isApproved: true,
-    status: 'approved',
-    approvalStatus: 'approved',
-  },
-  {
-    name: 'CyberShield Recruiter',
-    email: 'hr@cybershield.demo',
-    password: 'password123',
-    role: 'company',
-    companyName: 'CyberShield Security',
-    website: 'https://cybershield.demo',
-    isApproved: true,
-    status: 'approved',
-    approvalStatus: 'approved',
-  },
-  {
-    name: 'DataPulse Recruiter',
-    email: 'hr@datapulse.demo',
-    password: 'password123',
-    role: 'company',
-    companyName: 'DataPulse Analytics',
-    website: 'https://datapulse.demo',
-    isApproved: true,
-    status: 'approved',
-    approvalStatus: 'approved',
-  },
-];
+const ADMIN_EMAIL = 'admin@placeme.demo';
+const ADMIN_PASSWORD = 'Admin@123Password';
 
-// Jobs library for each company
-const COMPANY_JOBS = {
-  'TechCorp Solutions': [
-    {
-      title: 'Full Stack Software Engineer',
-      description: 'Looking for a skilled MERN stack developer to build scalable cloud-native web applications.',
-      location: 'Bengaluru, India (Hybrid)',
-      salary: '8 - 12 LPA',
-      jobType: 'Full-time',
-      experience: '0 - 2 Years',
-      skills: ['React', 'Node.js', 'MongoDB', 'Express', 'TailwindCSS'],
-      openings: 5,
-    },
-    {
-      title: 'Cloud DevOps Associate',
-      description: 'Design CI/CD automation pipelines, manage AWS/Docker environments, and maintain zero downtime deployment.',
-      location: 'Bengaluru, India',
-      salary: '7 - 10 LPA',
-      jobType: 'Full-time',
-      experience: 'Fresher / 0 - 1 Year',
-      skills: ['Docker', 'AWS', 'Linux', 'GitHub Actions', 'Node.js'],
-      openings: 3,
-    },
-  ],
-  'CodeCraft Solutions': [
-    {
-      title: 'Frontend React Developer',
-      description: 'Develop high-performance interactive SPAs and component libraries using React and Tailwind.',
-      location: 'Bengaluru, India',
-      salary: '6.5 - 9.5 LPA',
-      jobType: 'Full-time',
-      experience: '0 - 2 Years',
-      skills: ['React.js', 'JavaScript', 'HTML5', 'CSS3', 'REST API'],
-      openings: 4,
-    },
-    {
-      title: 'Backend API Engineer',
-      description: 'Build secure authentication, role-based controls, and microservices architecture.',
-      location: 'Remote',
-      salary: '8 - 11 LPA',
-      jobType: 'Full-time',
-      experience: '1 - 3 Years',
-      skills: ['Node.js', 'Express.js', 'MongoDB', 'JWT', 'System Design'],
-      openings: 2,
-    },
-  ],
-  'InnovateLabs': [
-    {
-      title: 'AI / Machine Learning Engineer',
-      description: 'Build predictive AI models, integrate LLM agents, and deploy model inference endpoints.',
-      location: 'Bengaluru, India',
-      salary: '10 - 15 LPA',
-      jobType: 'Full-time',
-      experience: '0 - 2 Years',
-      skills: ['Python', 'TensorFlow', 'PyTorch', 'Scikit-Learn', 'FastAPI'],
-      openings: 3,
-    },
-    {
-      title: 'Junior AI Research Intern',
-      description: 'Assist the research team in dataset curation, hyperparameter tuning, and model evaluation benchmarks.',
-      location: 'Bengaluru, India (On-site)',
-      salary: '25,000 / month Stipend',
-      jobType: 'Internship',
-      experience: 'Fresher',
-      skills: ['Python', 'Pandas', 'NumPy', 'Data Analysis'],
-      openings: 4,
-    },
-  ],
-  'CyberShield Security': [
-    {
-      title: 'Cybersecurity Analyst (SOC L1)',
-      description: 'Monitor security threats, conduct vulnerability scans, and implement endpoint security hardening.',
-      location: 'Bengaluru, India (Hybrid)',
-      salary: '7 - 11 LPA',
-      jobType: 'Full-time',
-      experience: '0 - 2 Years',
-      skills: ['Network Security', 'SIEM', 'Wireshark', 'OWASP Top 10', 'Linux'],
-      openings: 3,
-    },
-    {
-      title: 'Application Security Engineer',
-      description: 'Perform source code auditing, security assessments, penetration testing on web apps and APIs.',
-      location: 'Remote',
-      salary: '9 - 14 LPA',
-      jobType: 'Full-time',
-      experience: '1 - 3 Years',
-      skills: ['Penetration Testing', 'API Security', 'Burp Suite', 'Cryptography'],
-      openings: 2,
-    },
-  ],
-  'DataPulse Analytics': [
-    {
-      title: 'Business Data Analyst',
-      description: 'Transform complex business datasets into insightful BI dashboards and predictive reports.',
-      location: 'Bengaluru, India',
-      salary: '7 - 10 LPA',
-      jobType: 'Full-time',
-      experience: '0 - 2 Years',
-      skills: ['SQL', 'Python', 'Power BI', 'Excel', 'Data Visualization'],
-      openings: 4,
-    },
-    {
-      title: 'Data Engineering Associate',
-      description: 'Design ETL pipelines, data warehouse tables, and automated data ingestion workflows.',
-      location: 'Bengaluru, India (Hybrid)',
-      salary: '8 - 12 LPA',
-      jobType: 'Full-time',
-      experience: '0 - 2 Years',
-      skills: ['SQL', 'Python', 'MongoDB', 'ETL Pipelines', 'Airflow'],
-      openings: 2,
-    },
-  ],
-};
-
-const syncAllPermanentAccountsAndJobs = async () => {
+const resetDatabaseKeepOnlyAdmin = async () => {
   try {
-    // 1. Force approve ALL existing company accounts currently in the DB
-    await User.updateMany(
-      { role: 'company' },
-      {
-        $set: {
-          isApproved: true,
-          status: 'approved',
-          approvalStatus: 'approved',
-          companyStatus: 'approved',
-        },
-      }
-    );
+    // 1. Admin ke alawa baki sabhi users (students, companies) ko delete karo
+    const deletedUsers = await User.deleteMany({ role: { $ne: 'admin' } });
+    console.log(`🧹 Deleted non-admin users: ${deletedUsers.deletedCount}`);
 
-    // 2. Ensure default permanent accounts exist and have exact credentials
-    for (const acc of PERMANENT_USERS) {
-      let user = await User.findOne({ email: acc.email });
-      if (!user) {
-        user = new User(acc);
-        await user.save();
-        console.log(`✅ Created ${acc.role.toUpperCase()}: ${acc.email}`);
-      } else {
-        user.password = acc.password;
-        user.role = acc.role;
-        user.isApproved = true;
-        user.status = 'approved';
-        user.approvalStatus = 'approved';
-        if (acc.companyName) user.companyName = acc.companyName;
-        if (acc.website) user.website = acc.website;
-        await user.save();
-      }
+    // 2. Jobs collection clean karo
+    if (mongoose.connection.collections['jobs']) {
+      await mongoose.connection.collections['jobs'].deleteMany({});
+      console.log('🧹 All jobs deleted');
     }
 
-    // 3. Populate jobs for every single approved company
-    const allApprovedCompanies = await User.find({ role: 'company' });
-
-    for (const company of allApprovedCompanies) {
-      const cName = company.companyName || company.name;
-      const jobsToInsert = COMPANY_JOBS[cName] || [
-        {
-          title: 'Software Development Associate',
-          description: `Exciting opening at ${cName} for fresh graduates and early career developers.`,
-          location: 'Bengaluru, India',
-          salary: '6 - 9 LPA',
-          jobType: 'Full-time',
-          experience: '0 - 1 Year',
-          skills: ['JavaScript', 'React', 'Node.js', 'Problem Solving'],
-          openings: 3,
-        },
-      ];
-
-      for (const jobData of jobsToInsert) {
-        const existingJob = await Job.findOne({
-          title: jobData.title,
-          company: company._id,
-        });
-
-        if (!existingJob) {
-          await Job.create({
-            ...jobData,
-            company: company._id,
-            companyName: cName,
-            status: 'Active',
-            deadline: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
-          });
-          console.log(`💼 Seeded Job: "${jobData.title}" for ${cName}`);
-        }
-      }
+    // 3. Applications collection clean karo
+    if (mongoose.connection.collections['applications']) {
+      await mongoose.connection.collections['applications'].deleteMany({});
+      console.log('🧹 All applications deleted');
     }
 
-    console.log('✅ All companies approved and demo jobs populated successfully.');
+    // 4. Sirf ek fixed Admin ensure karo
+    let admin = await User.findOne({ email: ADMIN_EMAIL });
+    if (!admin) {
+      admin = new User({
+        name: 'Super Admin',
+        email: ADMIN_EMAIL,
+        password: ADMIN_PASSWORD,
+        role: 'admin',
+        isApproved: true,
+      });
+      await admin.save();
+      console.log(`✅ Single Permanent Admin Created: ${ADMIN_EMAIL}`);
+    } else {
+      admin.password = ADMIN_PASSWORD;
+      admin.role = 'admin';
+      admin.isApproved = true;
+      await admin.save();
+      console.log(`✅ Single Permanent Admin Verified: ${ADMIN_EMAIL}`);
+    }
+
+    // Agar koi aur admin account galti se bana ho toh use bhi clean kar do
+    await User.deleteMany({ role: 'admin', email: { $ne: ADMIN_EMAIL } });
+
+    console.log('🚀 Database fully cleaned. Only Super Admin remains.');
   } catch (err) {
-    console.error(`❌ Sync error: ${err.message}`);
+    console.error(`❌ Reset error: ${err.message}`);
   }
 };
 
@@ -277,7 +59,8 @@ const connectDB = async () => {
     });
     console.log(`MongoDB Connected: ${conn.connection.host}`);
 
-    await syncAllPermanentAccountsAndJobs();
+    // DB connect hote hi poora data clean karke sirf Admin lock karega
+    await resetDatabaseKeepOnlyAdmin();
   } catch (error) {
     console.error(`Error: ${error.message}`);
     process.exit(1);
