@@ -16,7 +16,7 @@ router.post('/', protect, applyForJob);
 // Interview schedule route
 router.post('/interview', protect, authorize('company'), scheduleInterview);
 
-// Status update route (Shortlist, Selected, Rejected ke liye)
+// Status update route
 router.put('/:id/status', protect, authorize('company'), updateApplicationStatus);
 
 // Student interviews fetch route
