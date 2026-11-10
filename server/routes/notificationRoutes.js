@@ -3,16 +3,12 @@ const router = express.Router();
 const Notification = require('../models/Notification');
 const { protect } = require('../middleware/authMiddleware');
 
-// GET /api/notifications - Get logged-in user's notifications
+// Get logged-in user notifications
 router.get('/', protect, async (req, res) => {
   try {
     const userId = req.user._id || req.user.id;
-
     const notifications = await Notification.find({
-      $or: [
-        { recipient: userId },
-        { user: userId }
-      ]
+      $or: [{ recipient: userId }, { user: userId }]
     }).sort({ createdAt: -1 });
 
     res.json(notifications);
@@ -21,7 +17,7 @@ router.get('/', protect, async (req, res) => {
   }
 });
 
-// PUT /api/notifications/:id/read - Mark notification as read
+// Mark as read
 router.put('/:id/read', protect, async (req, res) => {
   try {
     await Notification.findByIdAndUpdate(req.params.id, { isRead: true });
@@ -31,4 +27,4 @@ router.put('/:id/read', protect, async (req, res) => {
   }
 });
 
-module.exports = router;
+module.exports = router;  
