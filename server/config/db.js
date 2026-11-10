@@ -1,8 +1,8 @@
-const mongoose = require('mongoose');
-const User = require('../models/User');
+const mongoose = require("mongoose");
+const User = require("../models/User");
 
-const ADMIN_EMAIL = 'admin@placeme.demo';
-const ADMIN_PASSWORD = 'Admin@123Password';
+const ADMIN_EMAIL = "admin@placeme.demo";
+const ADMIN_PASSWORD = "Admin@123Password";
 
 const ensureSingleAdmin = async () => {
   try {
@@ -11,10 +11,10 @@ const ensureSingleAdmin = async () => {
     if (!admin) {
       // Agar pehle kisi aur email se admin bana tha jo invalid tha, safe side check
       admin = new User({
-        name: 'Super Admin',
+        name: "Super Admin",
         email: ADMIN_EMAIL,
         password: ADMIN_PASSWORD, // User schema ka pre-save hook isko hash kar dega
-        role: 'admin',
+        role: "admin",
         isApproved: true,
       });
       await admin.save();
@@ -22,7 +22,7 @@ const ensureSingleAdmin = async () => {
     } else {
       // Password re-sync kar do taaki invalid double-hash overwrite ho jaye
       admin.password = ADMIN_PASSWORD;
-      admin.role = 'admin';
+      admin.role = "admin";
       admin.isApproved = true;
       await admin.save();
       console.log(`✅ Permanent Admin Account Synced: ${ADMIN_EMAIL}`);
