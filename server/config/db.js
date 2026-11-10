@@ -1,216 +1,257 @@
-const mongoose = require("mongoose");
-const User = require("../models/User");
-const Job = require("../models/Job");
+const mongoose = require('mongoose');
+const User = require('../models/User');
+const Job = require('../models/Job');
+let Company;
+try {
+  Company = require('../models/Company');
+} catch (e) {
+  Company = null;
+}
 
-const ADMIN_EMAIL = "admin@placeme.demo";
-const ADMIN_PASSWORD = "Admin@123Password";
+const ADMIN_EMAIL = 'admin@placeme.demo';
+const ADMIN_PASSWORD = 'Admin@123Password';
 
 const COMPANIES_DATA = [
   {
-    name: "Google Recruiter",
-    email: "recruiter@google.demo",
-    password: "password123",
-    role: "company",
-    companyName: "Google",
-    website: "https://careers.google.com",
+    name: 'Google Recruiter',
+    email: 'recruiter@google.demo',
+    password: 'password123',
+    role: 'company',
+    companyName: 'Google',
+    website: 'https://careers.google.com',
+    industry: 'Technology & Cloud',
+    location: 'Bengaluru, India',
     isApproved: true,
-    status: "approved",
+    status: 'approved',
   },
   {
-    name: "Microsoft Recruiter",
-    email: "recruiter@microsoft.demo",
-    password: "password123",
-    role: "company",
-    companyName: "Microsoft",
-    website: "https://careers.microsoft.com",
+    name: 'Microsoft Recruiter',
+    email: 'recruiter@microsoft.demo',
+    password: 'password123',
+    role: 'company',
+    companyName: 'Microsoft',
+    website: 'https://careers.microsoft.com',
+    industry: 'Software & Cloud Services',
+    location: 'Bengaluru, India',
     isApproved: true,
-    status: "approved",
+    status: 'approved',
   },
   {
-    name: "Amazon Recruiter",
-    email: "recruiter@amazon.demo",
-    password: "password123",
-    role: "company",
-    companyName: "Amazon",
-    website: "https://amazon.jobs",
+    name: 'Amazon Recruiter',
+    email: 'recruiter@amazon.demo',
+    password: 'password123',
+    role: 'company',
+    companyName: 'Amazon',
+    website: 'https://amazon.jobs',
+    industry: 'E-Commerce & Cloud Computing',
+    location: 'Bengaluru, India',
     isApproved: true,
-    status: "approved",
+    status: 'approved',
   },
   {
-    name: "Infosys Recruiter",
-    email: "recruiter@infosys.demo",
-    password: "password123",
-    role: "company",
-    companyName: "Infosys",
-    website: "https://infosys.com/careers",
+    name: 'Infosys Recruiter',
+    email: 'recruiter@infosys.demo',
+    password: 'password123',
+    role: 'company',
+    companyName: 'Infosys',
+    website: 'https://infosys.com/careers',
+    industry: 'Information Technology & Consulting',
+    location: 'Bengaluru, India',
     isApproved: true,
-    status: "approved",
+    status: 'approved',
   },
   {
-    name: "TCS Recruiter",
-    email: "recruiter@tcs.demo",
-    password: "password123",
-    role: "company",
-    companyName: "TCS",
-    website: "https://tcs.com/careers",
+    name: 'TCS Recruiter',
+    email: 'recruiter@tcs.demo',
+    password: 'password123',
+    role: 'company',
+    companyName: 'TCS',
+    website: 'https://tcs.com/careers',
+    industry: 'IT Services & Consulting',
+    location: 'Bengaluru, India',
     isApproved: true,
-    status: "approved",
+    status: 'approved',
   },
 ];
 
 const TEN_JOBS = {
-  Google: [
+  'Google': [
     {
-      title: "Associate Cloud Engineer",
-      description:
-        "Manage GCP infrastructure, monitor microservices, and deploy high-availability services.",
-      location: "Bengaluru, India",
-      salary: "14 - 18 LPA",
-      jobType: "Full-Time",
+      title: 'Associate Cloud Engineer',
+      description: 'Manage GCP infrastructure, monitor microservices, and deploy high-availability services.',
+      location: 'Bengaluru, India',
+      salary: '14 - 18 LPA',
+      jobType: 'Full-Time',
       minCgpa: 7.5,
-      requiredDegree: "BCA / B.Tech / MCA",
-      branches: ["Computer Science", "AI & ML", "Information Science"],
+      requiredDegree: 'BCA / B.Tech / MCA',
+      branches: ['Computer Science', 'AI & ML', 'Information Science'],
     },
     {
-      title: "Frontend Software Engineer",
-      description:
-        "Build performant, accessible, and responsive user interfaces using React and modern JavaScript.",
-      location: "Bengaluru, India (Hybrid)",
-      salary: "12 - 16 LPA",
-      jobType: "Full-Time",
+      title: 'Frontend Software Engineer',
+      description: 'Build performant, accessible, and responsive user interfaces using React and modern JavaScript.',
+      location: 'Bengaluru, India (Hybrid)',
+      salary: '12 - 16 LPA',
+      jobType: 'Full-Time',
       minCgpa: 7.0,
-      requiredDegree: "BCA / B.Tech",
-      branches: ["Computer Science", "Information Science"],
+      requiredDegree: 'BCA / B.Tech',
+      branches: ['Computer Science', 'Information Science'],
     },
   ],
-  Microsoft: [
+  'Microsoft': [
     {
-      title: "Full Stack Web Developer",
-      description:
-        "Design RESTful microservices and scalable web applications using React, Node.js, and Azure.",
-      location: "Bengaluru, India",
-      salary: "13 - 17 LPA",
-      jobType: "Full-Time",
+      title: 'Full Stack Web Developer',
+      description: 'Design RESTful microservices and scalable web applications using React, Node.js, and Azure.',
+      location: 'Bengaluru, India',
+      salary: '13 - 17 LPA',
+      jobType: 'Full-Time',
       minCgpa: 7.0,
-      requiredDegree: "BCA / B.Tech / MCA",
-      branches: ["Computer Science", "AI & ML"],
+      requiredDegree: 'BCA / B.Tech / MCA',
+      branches: ['Computer Science', 'AI & ML'],
     },
     {
-      title: "DevOps & Reliability Engineer",
-      description:
-        "Implement automated CI/CD pipelines, Docker containers, and infrastructure monitoring.",
-      location: "Hyderabad / Remote",
-      salary: "11 - 15 LPA",
-      jobType: "Full-Time",
+      title: 'DevOps & Reliability Engineer',
+      description: 'Implement automated CI/CD pipelines, Docker containers, and infrastructure monitoring.',
+      location: 'Hyderabad / Remote',
+      salary: '11 - 15 LPA',
+      jobType: 'Full-Time',
       minCgpa: 6.8,
-      requiredDegree: "BCA / B.Tech",
-      branches: ["Computer Science", "Information Technology"],
+      requiredDegree: 'BCA / B.Tech',
+      branches: ['Computer Science', 'Information Technology'],
     },
   ],
-  Amazon: [
+  'Amazon': [
     {
-      title: "Software Development Engineer - I",
-      description:
-        "Solve complex algorithmic problems, optimize high-traffic database operations, and build core backend APIs.",
-      location: "Bengaluru, India",
-      salary: "15 - 20 LPA",
-      jobType: "Full-Time",
+      title: 'Software Development Engineer - I',
+      description: 'Solve complex algorithmic problems, optimize high-traffic database operations, and build core backend APIs.',
+      location: 'Bengaluru, India',
+      salary: '15 - 20 LPA',
+      jobType: 'Full-Time',
       minCgpa: 7.5,
-      requiredDegree: "BCA / B.Tech / MCA",
-      branches: ["Computer Science", "AI & ML", "Data Science"],
+      requiredDegree: 'BCA / B.Tech / MCA',
+      branches: ['Computer Science', 'AI & ML', 'Data Science'],
     },
     {
-      title: "Data Analyst Associate",
-      description:
-        "Analyze user behavior data, build automated business dashboards using SQL and Python.",
-      location: "Bengaluru, India",
-      salary: "9 - 13 LPA",
-      jobType: "Full-Time",
+      title: 'Data Analyst Associate',
+      description: 'Analyze user behavior data, build automated business dashboards using SQL and Python.',
+      location: 'Bengaluru, India',
+      salary: '9 - 13 LPA',
+      jobType: 'Full-Time',
       minCgpa: 6.5,
-      requiredDegree: "BCA / B.Sc / B.Tech",
-      branches: ["Computer Science", "AI & ML", "Statistics"],
+      requiredDegree: 'BCA / B.Sc / B.Tech',
+      branches: ['Computer Science', 'AI & ML', 'Statistics'],
     },
   ],
-  Infosys: [
+  'Infosys': [
     {
-      title: "Systems Engineer",
-      description:
-        "Develop enterprise software solutions, write clean unit tests, and integrate database components.",
-      location: "Bengaluru / Mysuru",
-      salary: "6.5 - 9 LPA",
-      jobType: "Full-Time",
+      title: 'Systems Engineer',
+      description: 'Develop enterprise software solutions, write clean unit tests, and integrate database components.',
+      location: 'Bengaluru / Mysuru',
+      salary: '6.5 - 9 LPA',
+      jobType: 'Full-Time',
       minCgpa: 6.0,
-      requiredDegree: "BCA / B.Tech / B.Sc",
-      branches: ["Computer Science", "Information Science", "All Branches"],
+      requiredDegree: 'BCA / B.Tech / B.Sc',
+      branches: ['Computer Science', 'Information Science', 'All Branches'],
     },
     {
-      title: "AI & Data Science Intern",
-      description:
-        "Work on predictive machine learning models, data preprocessing, and automated reporting scripts.",
-      location: "Bengaluru, India",
-      salary: "30,000 / month Stipend",
-      jobType: "Internship",
+      title: 'AI & Data Science Intern',
+      description: 'Work on predictive machine learning models, data preprocessing, and automated reporting scripts.',
+      location: 'Bengaluru, India',
+      salary: '30,000 / month Stipend',
+      jobType: 'Internship',
       minCgpa: 6.5,
-      requiredDegree: "BCA / B.Tech",
-      branches: ["AI & ML", "Data Science", "Computer Science"],
+      requiredDegree: 'BCA / B.Tech',
+      branches: ['AI & ML', 'Data Science', 'Computer Science'],
     },
   ],
-  TCS: [
+  'TCS': [
     {
-      title: "Cybersecurity Associate",
-      description:
-        "Conduct vulnerability scans, inspect network traffic logs, and enforce endpoint compliance.",
-      location: "Bengaluru, India",
-      salary: "7 - 10 LPA",
-      jobType: "Full-Time",
+      title: 'Cybersecurity Associate',
+      description: 'Conduct vulnerability scans, inspect network traffic logs, and enforce endpoint compliance.',
+      location: 'Bengaluru, India',
+      salary: '7 - 10 LPA',
+      jobType: 'Full-Time',
       minCgpa: 6.5,
-      requiredDegree: "BCA / B.Tech / MCA",
-      branches: ["Computer Science", "Information Security"],
+      requiredDegree: 'BCA / B.Tech / MCA',
+      branches: ['Computer Science', 'Information Security'],
     },
     {
-      title: "Database Administrator Associate",
-      description:
-        "Maintain SQL/NoSQL databases, perform indexing optimization, and manage data backups.",
-      location: "Bengaluru, India (Hybrid)",
-      salary: "6.5 - 9.5 LPA",
-      jobType: "Full-Time",
+      title: 'Database Administrator Associate',
+      description: 'Maintain SQL/NoSQL databases, perform indexing optimization, and manage data backups.',
+      location: 'Bengaluru, India (Hybrid)',
+      salary: '6.5 - 9.5 LPA',
+      jobType: 'Full-Time',
       minCgpa: 6.0,
-      requiredDegree: "BCA / B.Tech",
-      branches: ["Computer Science", "Information Technology"],
+      requiredDegree: 'BCA / B.Tech',
+      branches: ['Computer Science', 'Information Technology'],
     },
   ],
 };
 
 const setupClean5Companies10Jobs = async () => {
   try {
-    // 1. Purani saari jobs aur non-admin users clean karo taaki count mismatch na ho
-    await User.deleteMany({ role: { $ne: "admin" } });
-    if (mongoose.connection.collections["jobs"]) {
-      await mongoose.connection.collections["jobs"].deleteMany({});
+    // 1. Wipe non-admin users, existing company profiles, aur jobs
+    await User.deleteMany({ role: { $ne: 'admin' } });
+    if (Company) {
+      await Company.deleteMany({});
+    } else if (mongoose.connection.collections['companies']) {
+      await mongoose.connection.collections['companies'].deleteMany({});
     }
 
-    // 2. Admin ensure
+    if (mongoose.connection.collections['jobs']) {
+      await mongoose.connection.collections['jobs'].deleteMany({});
+    }
+
+    // 2. Super Admin Ensure
     let admin = await User.findOne({ email: ADMIN_EMAIL });
     if (!admin) {
       admin = new User({
-        name: "Super Admin",
+        name: 'Super Admin',
         email: ADMIN_EMAIL,
         password: ADMIN_PASSWORD,
-        role: "admin",
+        role: 'admin',
         isApproved: true,
       });
       await admin.save();
     }
 
-    // 3. Exactly 5 Approved Companies Create Karo
+    // 3. Create exactly 5 Companies in User Model AND Company Model
     const companyMap = {};
     for (const cData of COMPANIES_DATA) {
-      const company = new User(cData);
-      await company.save();
-      companyMap[cData.companyName] = company;
+      const companyUser = new User(cData);
+      await companyUser.save();
+      companyMap[cData.companyName] = companyUser;
+
+      // Agar alag se Company profile model exist karta hai toh document insert karo
+      if (Company) {
+        await Company.create({
+          user: companyUser._id,
+          name: cData.companyName,
+          companyName: cData.companyName,
+          email: cData.email,
+          website: cData.website,
+          industry: cData.industry,
+          location: cData.location,
+          isApproved: true,
+          status: 'approved',
+        });
+      } else if (mongoose.connection.collections['companies']) {
+        await mongoose.connection.collections['companies'].insertOne({
+          user: companyUser._id,
+          name: cData.companyName,
+          companyName: cData.companyName,
+          email: cData.email,
+          website: cData.website,
+          industry: cData.industry,
+          location: cData.location,
+          isApproved: true,
+          status: 'approved',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
     }
 
-    // 4. Exactly 10 Jobs Create Karo (Har company ki 2)
+    // 4. Exactly 10 Jobs Create Karo
     for (const [cName, jobs] of Object.entries(TEN_JOBS)) {
       const cUser = companyMap[cName];
       for (const j of jobs) {
@@ -227,18 +268,18 @@ const setupClean5Companies10Jobs = async () => {
           },
           minCgpa: j.minCgpa,
           requiredDegree: j.requiredDegree,
-          branch: j.branches.join(", "),
+          branch: j.branches.join(', '),
           company: cUser._id,
           companyName: cName,
-          status: "Active",
+          status: 'Active',
           deadline: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000),
         });
       }
     }
 
-    console.log("🎯 EXACT MATCH DONE: 5 Companies, 10 Jobs.");
+    console.log('🎯 POPULATED BOTH MODELS: Exactly 5 Companies and 10 Jobs live.');
   } catch (err) {
-    console.error("❌ Sync error:", err.message);
+    console.error('❌ Sync error:', err.message);
   }
 };
 
