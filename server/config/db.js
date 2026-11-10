@@ -6,20 +6,25 @@ const ADMIN_PASSWORD = 'Admin@123Password';
 
 const wipeEverythingExceptAdmin = async () => {
   try {
-    // Sab collections saaf karo
-    await User.deleteMany({ role: { $ne: 'admin' } });
-    
+    // 1. Admin ke email ke alawa baaki SAARA user data delete (Student, Company sab ek sath 0 honge)
+    const result = await User.deleteMany({ email: { $ne: ADMIN_EMAIL } });
+    console.log(`🧹 Deleted Non-Admin Users: ${result.deletedCount}`);
+
+    // 2. Jobs, Applications, Profiles sab wipe
     if (mongoose.connection.collections['jobs']) {
       await mongoose.connection.collections['jobs'].deleteMany({});
     }
     if (mongoose.connection.collections['applications']) {
       await mongoose.connection.collections['applications'].deleteMany({});
     }
-    if (mongoose.connection.collections['interviews']) {
-      await mongoose.connection.collections['interviews'].deleteMany({});
+    if (mongoose.connection.collections['students']) {
+      await mongoose.connection.collections['students'].deleteMany({});
+    }
+    if (mongoose.connection.collections['companies']) {
+      await mongoose.connection.collections['companies'].deleteMany({});
     }
 
-    // Ensure only 1 Admin
+    // 3. Sirf Super Admin ensure karo
     let admin = await User.findOne({ email: ADMIN_EMAIL });
     if (!admin) {
       admin = new User({
@@ -30,6 +35,7 @@ const wipeEverythingExceptAdmin = async () => {
         isApproved: true,
       });
       await admin.save();
+      console.log(`✅ Super Admin Ready: ${ADMIN_EMAIL}`);
     } else {
       admin.password = ADMIN_PASSWORD;
       admin.role = 'admin';
@@ -37,10 +43,7 @@ const wipeEverythingExceptAdmin = async () => {
       await admin.save();
     }
 
-    // Extra fake admins delete
-    await User.deleteMany({ role: 'admin', email: { $ne: ADMIN_EMAIL } });
-
-    console.log('✅ DATABASE FULLY WIPED: Only 1 Admin remains.');
+    console.log('🚀 SYSTEM READY: Exactly 0 Students, 0 Companies, 0 Jobs.');
   } catch (err) {
     console.error('❌ Wipe Error:', err.message);
   }
