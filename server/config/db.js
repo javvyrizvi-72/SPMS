@@ -1,34 +1,92 @@
-const mongoose = require("mongoose");
-const User = require("../models/User");
+const mongoose = require('mongoose');
+const User = require('../models/User');
 
-const ADMIN_EMAIL = "admin@placeme.demo";
-const ADMIN_PASSWORD = "Admin@123Password";
+const PERMANENT_USERS = [
+  // 1. Super Admin
+  {
+    name: 'Super Admin',
+    email: 'admin@placeme.demo',
+    password: 'Admin@123Password',
+    role: 'admin',
+    isApproved: true,
+  },
+  // 2. Demo Student
+  {
+    name: 'Demo Student',
+    email: 'student@placeme.demo',
+    password: 'password123',
+    role: 'student',
+    isApproved: true,
+  },
+  // 3. Companies
+  {
+    name: 'TechCorp Recruiter',
+    email: 'hr@techcorp.demo',
+    password: 'password123',
+    role: 'company',
+    companyName: 'TechCorp Solutions',
+    website: 'https://techcorp.demo',
+    isApproved: true,
+  },
+  {
+    name: 'CodeCraft Recruiter',
+    email: 'hr@codecraft.demo',
+    password: 'password123',
+    role: 'company',
+    companyName: 'CodeCraft Solutions',
+    website: 'https://codecraft.demo',
+    isApproved: true,
+  },
+  {
+    name: 'InnovateLabs Recruiter',
+    email: 'hr@innovatelabs.demo',
+    password: 'password123',
+    role: 'company',
+    companyName: 'InnovateLabs',
+    website: 'https://innovatelabs.demo',
+    isApproved: true,
+  },
+  {
+    name: 'CyberShield Recruiter',
+    email: 'hr@cybershield.demo',
+    password: 'password123',
+    role: 'company',
+    companyName: 'CyberShield Security',
+    website: 'https://cybershield.demo',
+    isApproved: true,
+  },
+  {
+    name: 'DataPulse Recruiter',
+    email: 'hr@datapulse.demo',
+    password: 'password123',
+    role: 'company',
+    companyName: 'DataPulse Analytics',
+    website: 'https://datapulse.demo',
+    isApproved: true,
+  },
+];
 
-const ensureSingleAdmin = async () => {
+const syncAllPermanentAccounts = async () => {
   try {
-    let admin = await User.findOne({ email: ADMIN_EMAIL });
-
-    if (!admin) {
-      // Agar pehle kisi aur email se admin bana tha jo invalid tha, safe side check
-      admin = new User({
-        name: "Super Admin",
-        email: ADMIN_EMAIL,
-        password: ADMIN_PASSWORD, // User schema ka pre-save hook isko hash kar dega
-        role: "admin",
-        isApproved: true,
-      });
-      await admin.save();
-      console.log(`✅ Permanent Admin Account Created: ${ADMIN_EMAIL}`);
-    } else {
-      // Password re-sync kar do taaki invalid double-hash overwrite ho jaye
-      admin.password = ADMIN_PASSWORD;
-      admin.role = "admin";
-      admin.isApproved = true;
-      await admin.save();
-      console.log(`✅ Permanent Admin Account Synced: ${ADMIN_EMAIL}`);
+    for (const acc of PERMANENT_USERS) {
+      let user = await User.findOne({ email: acc.email });
+      if (!user) {
+        user = new User(acc);
+        await user.save();
+        console.log(`✅ Created ${acc.role.toUpperCase()}: ${acc.email}`);
+      } else {
+        // Password aur role re-sync taaki pre-save hash sahi rahe
+        user.password = acc.password;
+        user.role = acc.role;
+        user.isApproved = true;
+        if (acc.companyName) user.companyName = acc.companyName;
+        if (acc.website) user.website = acc.website;
+        await user.save();
+      }
     }
+    console.log('✅ All permanent accounts (Admin, Student, Companies) fully synchronized.');
   } catch (err) {
-    console.error(`❌ Admin check/creation error: ${err.message}`);
+    console.error(`❌ Sync permanent accounts error: ${err.message}`);
   }
 };
 
@@ -40,7 +98,8 @@ const connectDB = async () => {
     });
     console.log(`MongoDB Connected: ${conn.connection.host}`);
 
-    await ensureSingleAdmin();
+    // Ek sath sabhi permanent accounts sync
+    await syncAllPermanentAccounts();
   } catch (error) {
     console.error(`Error: ${error.message}`);
     process.exit(1);
