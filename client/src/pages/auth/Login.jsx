@@ -7,8 +7,12 @@ import toast from 'react-hot-toast'
 import { Eye, EyeOff, LogIn, GraduationCap, AlertCircle, Building2 } from 'lucide-react'
 import ServerStatus from '../../components/common/ServerStatus'
 
-const DEMO = [
-  { label: 'Company demo', icon: Building2, email: 'hr@codecraft.demo', password: 'Company@123' },
+const DEMO_COMPANIES = [
+  { name: 'CodeCraft Solutions', email: 'hr@codecraft.demo', password: 'Company@123' },
+  { name: 'TechCorp Solutions', email: 'hr@techcorp.demo', password: 'password123' },
+  { name: 'InnovateLabs', email: 'hr@innovatelabs.demo', password: 'password123' },
+  { name: 'CyberShield Security', email: 'hr@cybershield.demo', password: 'password123' },
+  { name: 'DataPulse Analytics', email: 'hr@datapulse.demo', password: 'password123' },
 ]
 
 const Login = () => {
@@ -17,12 +21,21 @@ const Login = () => {
   const [loading, setLoading] = useState(false)
   const [slow, setSlow] = useState(false)
   const [error, setError] = useState('')
+  const [demoIndex, setDemoIndex] = useState(0)
   const { user, loading: authLoading, login } = useAuth()
   const navigate = useNavigate()
 
   useEffect(() => {
     if (!authLoading && user) navigate(getDashboardPath(user.role), { replace: true })
   }, [authLoading, user, navigate])
+
+  const handleCompanyDemoCycle = () => {
+    const current = DEMO_COMPANIES[demoIndex]
+    setForm({ email: current.email, password: current.password })
+    setError('')
+    toast.success(`Loaded Demo: ${current.name}`)
+    setDemoIndex((prev) => (prev + 1) % DEMO_COMPANIES.length)
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -126,14 +139,14 @@ const Login = () => {
           </form>
 
           <div className="mt-6">
-            <p className="text-center text-xs text-navy-400 mb-2">Try a demo account</p>
             <div className="grid grid-cols-1 gap-3">
-              {DEMO.map(({ label, icon: Icon, email, password }) => (
-                <button key={label} type="button" onClick={() => { setForm({ email, password }); setError('') }}
-                  className="flex items-center justify-center gap-2 py-2 rounded-lg border border-navy-600 text-sm text-navy-200 hover:border-gold-500/60 hover:text-gold-300 transition-colors">
-                  <Icon size={15} /> {label}
-                </button>
-              ))}
+              <button 
+                type="button" 
+                onClick={handleCompanyDemoCycle}
+                className="flex items-center justify-center gap-2 py-2 rounded-lg border border-navy-600 text-sm text-navy-200 hover:border-gold-500/60 hover:text-gold-300 transition-colors"
+              >
+                <Building2 size={15} /> Company demo
+              </button>
             </div>
           </div>
 

@@ -20,6 +20,7 @@ const Register = () => {
     role: 'student' 
   })
   const [showPass, setShowPass] = useState(false)
+  const [showConfirmPass, setShowConfirmPass] = useState(false)
   const [loading, setLoading] = useState(false)
   const [slow, setSlow] = useState(false)
   const [error, setError] = useState('')
@@ -202,15 +203,25 @@ const Register = () => {
                 </div>
                 <div>
                   <label className={label}>CONFIRM PASSWORD</label>
-                  <input 
-                    type={showPass ? 'text' : 'password'} 
-                    autoComplete="new-password" 
-                    className="input-field" 
-                    placeholder="Repeat password" 
-                    value={form.confirm} 
-                    onChange={set('confirm')} 
-                    required 
-                  />
+                  <div className="relative">
+                    <input 
+                      type={showConfirmPass ? 'text' : 'password'} 
+                      autoComplete="new-password" 
+                      className="input-field pr-11" 
+                      placeholder="Repeat password" 
+                      value={form.confirm} 
+                      onChange={set('confirm')} 
+                      required 
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => setShowConfirmPass(!showConfirmPass)} 
+                      aria-label="Show or hide confirm password" 
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-300 hover:text-gold-400"
+                    >
+                      {showConfirmPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
               </div>
 
