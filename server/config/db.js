@@ -1,31 +1,31 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
-const User = require('../models/User'); // Agar path alag ho toh match kar lena
+const User = require('../models/User');
 
-// Fixed Permanent Admin Credentials
 const ADMIN_EMAIL = 'admin@placeme.demo';
 const ADMIN_PASSWORD = 'Admin@123Password';
 
 const ensureSingleAdmin = async () => {
   try {
-    const existingAdmin = await User.findOne({ 
-      $or: [{ email: ADMIN_EMAIL }, { role: 'admin' }] 
-    });
+    let admin = await User.findOne({ email: ADMIN_EMAIL });
 
-    if (!existingAdmin) {
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, salt);
-
-      await User.create({
+    if (!admin) {
+      // Agar pehle kisi aur email se admin bana tha jo invalid tha, safe side check
+      admin = new User({
         name: 'Super Admin',
         email: ADMIN_EMAIL,
-        password: hashedPassword,
+        password: ADMIN_PASSWORD, // User schema ka pre-save hook isko hash kar dega
         role: 'admin',
         isApproved: true,
       });
+      await admin.save();
       console.log(`✅ Permanent Admin Account Created: ${ADMIN_EMAIL}`);
     } else {
-      console.log(`✅ Permanent Admin Account Verified: ${existingAdmin.email}`);
+      // Password re-sync kar do taaki invalid double-hash overwrite ho jaye
+      admin.password = ADMIN_PASSWORD;
+      admin.role = 'admin';
+      admin.isApproved = true;
+      await admin.save();
+      console.log(`✅ Permanent Admin Account Synced: ${ADMIN_EMAIL}`);
     }
   } catch (err) {
     console.error(`❌ Admin check/creation error: ${err.message}`);
@@ -40,7 +40,6 @@ const connectDB = async () => {
     });
     console.log(`MongoDB Connected: ${conn.connection.host}`);
 
-    // Har connect pe single admin verify aur ensure karega
     await ensureSingleAdmin();
   } catch (error) {
     console.error(`Error: ${error.message}`);
