@@ -6,8 +6,16 @@ const { protect } = require('../middleware/authMiddleware');
 // Get my notifications
 router.get('/', protect, async (req, res) => {
   try {
-    const notifications = await Notification.find({ recipient: req.user.id })
-      .sort({ createdAt: -1 });
+    const userId = req.user._id || req.user.id;
+
+    // Recipient aur user dono fields check karo
+    const notifications = await Notification.find({
+      $or: [
+        { recipient: userId },
+        { user: userId }
+      ]
+    }).sort({ createdAt: -1 });
+
     res.json(notifications);
   } catch (error) {
     res.status(500).json({ message: error.message });
