@@ -63,7 +63,6 @@ exports.getDashboardStats = async (req, res) => {
         let studentName = 'Student';
         let studentEmail = '';
 
-        // Check if student was populated directly or via Student model
         if (app.student) {
           if (app.student.user && app.student.user.name) {
             studentName = app.student.user.name;
@@ -73,7 +72,6 @@ exports.getDashboardStats = async (req, res) => {
           } else if (app.student.fullName) {
             studentName = app.student.fullName;
           } else {
-            // Direct user lookup fallback
             const u = await User.findById(app.student).lean();
             if (u) {
               studentName = u.name;
@@ -115,7 +113,7 @@ exports.getDashboardStats = async (req, res) => {
   }
 };
 
-// 2. Get All Students (Resolves Name, College, CGPA accurately)
+// 2. Get All Students
 exports.getAllStudents = async (req, res) => {
   try {
     let students = [];
@@ -138,7 +136,6 @@ exports.getAllStudents = async (req, res) => {
       }));
     }
 
-    // Agar Student profile collection khali ho, direct User collection se uthao
     if (!students.length) {
       const userStudents = await User.find({ role: 'student' }).sort({ createdAt: -1 }).lean();
       students = userStudents.map(u => ({
@@ -160,11 +157,10 @@ exports.getAllStudents = async (req, res) => {
   }
 };
 
-// 3. Delete Student (Safe cascading delete so "Failed to delete" error never happens)
+// 3. Delete Student (Safe cascading delete)
 exports.deleteStudent = async (req, res) => {
   try {
     const studentId = req.params.id;
-
     let targetUserId = studentId;
 
     if (Student) {
@@ -175,26 +171,17 @@ exports.deleteStudent = async (req, res) => {
       }
     }
 
-    // Clean up applications submitted by this student
     await Application.deleteMany({
-      $or: [
-        { student: studentId },
-        { student: targetUserId }
-      ]
+      $or: [{ student: studentId }, { student: targetUserId }]
     });
 
-    // Clean up notifications for this student
     await Notification.deleteMany({
-      $or: [
-        { recipient: targetUserId },
-        { user: targetUserId }
-      ]
+      $or: [{ recipient: targetUserId }, { user: targetUserId }]
     });
 
-    // Delete student user account
     await User.findByIdAndDelete(targetUserId);
 
-    res.json({ success: true, message: 'Student and related records deleted successfully' });
+    res.json({ success: true, message: 'Student deleted successfully' });
   } catch (error) {
     console.error('Delete student error:', error);
     res.status(500).json({ message: error.message });
@@ -221,6 +208,100 @@ exports.updateStudentStatus = async (req, res) => {
     res.json({ success: true, message: 'Student status updated successfully' });
   } catch (error) {
     console.error('Update status error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// 5. Get All Companies for Admin Verification Page
+exports.getAllCompanies = async (req, res) => {
+  try {
+    let companyList = [];
+
+    if (Company) {
+      companyList = await Company.find({})
+        .populate('user', 'email isApproved status name')
+        .sort({ createdAt: -1 })
+        .lean();
+    }
+
+    if (!companyList.length) {
+      const companyUsers = await User.find({ role: 'company' }).sort({ createdAt: -1 }).lean();
+      companyList = companyUsers.map(u => ({
+        _id: u._id,
+        name: u.companyName || u.name,
+        email: u.email,
+        industry: 'Technology & Cloud',
+        location: 'Bengaluru, India',
+        website: 'careers.company.com',
+        description: 'Verified recruitment partner',
+        isVerified: u.isApproved !== false,
+        status: u.isApproved !== false ? 'Verified' : 'Pending',
+        user: u._id
+      }));
+    }
+
+    res.json(companyList);
+  } catch (error) {
+    console.error('Get all companies error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// 6. Verify or Toggle Company Status
+exports.verifyCompany = async (req, res) => {
+  try {
+    const companyId = req.params.id;
+    const { isVerified, status } = req.body;
+
+    const approvedState = isVerified !== undefined ? isVerified : status === 'Verified';
+
+    let targetUserId = companyId;
+
+    if (Company) {
+      const comp = await Company.findById(companyId);
+      if (comp) {
+        comp.isVerified = approvedState;
+        comp.status = approvedState ? 'Verified' : 'Pending';
+        await comp.save();
+        if (comp.user) targetUserId = comp.user;
+      }
+    }
+
+    await User.findByIdAndUpdate(targetUserId, {
+      isApproved: approvedState,
+      status: approvedState ? 'Verified' : 'Pending'
+    });
+
+    res.json({ success: true, message: 'Company status updated successfully' });
+  } catch (error) {
+    console.error('Verify company error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// 7. Delete Company
+exports.deleteCompany = async (req, res) => {
+  try {
+    const companyId = req.params.id;
+    let targetUserId = companyId;
+
+    if (Company) {
+      const comp = await Company.findById(companyId);
+      if (comp) {
+        targetUserId = comp.user || companyId;
+        await Company.findByIdAndDelete(companyId);
+      }
+    }
+
+    await Job.deleteMany({
+      $or: [{ company: companyId }, { company: targetUserId }, { createdBy: targetUserId }]
+    });
+
+    await User.findByIdAndDelete(targetUserId);
+
+    res.json({ success: true, message: 'Company deleted successfully' });
+  } catch (error) {
+    console.error('Delete company error:', error);
     res.status(500).json({ message: error.message });
   }
 };
