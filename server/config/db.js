@@ -1,8 +1,7 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
-const Job = require('../models/Job'); // Tumhara Job model
+const Job = require('../models/Job');
 
-// 1. Permanent Users List
 const PERMANENT_USERS = [
   {
     name: 'Super Admin',
@@ -10,6 +9,8 @@ const PERMANENT_USERS = [
     password: 'Admin@123Password',
     role: 'admin',
     isApproved: true,
+    status: 'approved',
+    approvalStatus: 'approved',
   },
   {
     name: 'Demo Student',
@@ -17,6 +18,8 @@ const PERMANENT_USERS = [
     password: 'password123',
     role: 'student',
     isApproved: true,
+    status: 'approved',
+    approvalStatus: 'approved',
   },
   {
     name: 'TechCorp Recruiter',
@@ -26,6 +29,8 @@ const PERMANENT_USERS = [
     companyName: 'TechCorp Solutions',
     website: 'https://techcorp.demo',
     isApproved: true,
+    status: 'approved',
+    approvalStatus: 'approved',
   },
   {
     name: 'CodeCraft Recruiter',
@@ -35,6 +40,8 @@ const PERMANENT_USERS = [
     companyName: 'CodeCraft Solutions',
     website: 'https://codecraft.demo',
     isApproved: true,
+    status: 'approved',
+    approvalStatus: 'approved',
   },
   {
     name: 'InnovateLabs Recruiter',
@@ -44,6 +51,8 @@ const PERMANENT_USERS = [
     companyName: 'InnovateLabs',
     website: 'https://innovatelabs.demo',
     isApproved: true,
+    status: 'approved',
+    approvalStatus: 'approved',
   },
   {
     name: 'CyberShield Recruiter',
@@ -53,6 +62,8 @@ const PERMANENT_USERS = [
     companyName: 'CyberShield Security',
     website: 'https://cybershield.demo',
     isApproved: true,
+    status: 'approved',
+    approvalStatus: 'approved',
   },
   {
     name: 'DataPulse Recruiter',
@@ -62,10 +73,12 @@ const PERMANENT_USERS = [
     companyName: 'DataPulse Analytics',
     website: 'https://datapulse.demo',
     isApproved: true,
+    status: 'approved',
+    approvalStatus: 'approved',
   },
 ];
 
-// 2. Demo Jobs Mapping for Each Company
+// Jobs library for each company
 const COMPANY_JOBS = {
   'TechCorp Solutions': [
     {
@@ -181,9 +194,20 @@ const COMPANY_JOBS = {
 
 const syncAllPermanentAccountsAndJobs = async () => {
   try {
-    const companyUserMap = {};
+    // 1. Force approve ALL existing company accounts currently in the DB
+    await User.updateMany(
+      { role: 'company' },
+      {
+        $set: {
+          isApproved: true,
+          status: 'approved',
+          approvalStatus: 'approved',
+          companyStatus: 'approved',
+        },
+      }
+    );
 
-    // 1. Ensure all users exist, have matching passwords, and are APPROVED
+    // 2. Ensure default permanent accounts exist and have exact credentials
     for (const acc of PERMANENT_USERS) {
       let user = await User.findOne({ email: acc.email });
       if (!user) {
@@ -193,42 +217,53 @@ const syncAllPermanentAccountsAndJobs = async () => {
       } else {
         user.password = acc.password;
         user.role = acc.role;
-        user.isApproved = true; // FORCE APPROVAL
+        user.isApproved = true;
+        user.status = 'approved';
+        user.approvalStatus = 'approved';
         if (acc.companyName) user.companyName = acc.companyName;
         if (acc.website) user.website = acc.website;
         await user.save();
       }
-
-      if (acc.role === 'company') {
-        companyUserMap[acc.companyName] = user;
-      }
     }
 
-    // 2. Ensure every company has active jobs
-    for (const [companyName, jobsList] of Object.entries(COMPANY_JOBS)) {
-      const companyUser = companyUserMap[companyName];
-      if (!companyUser) continue;
+    // 3. Populate jobs for every single approved company
+    const allApprovedCompanies = await User.find({ role: 'company' });
 
-      for (const jobData of jobsList) {
+    for (const company of allApprovedCompanies) {
+      const cName = company.companyName || company.name;
+      const jobsToInsert = COMPANY_JOBS[cName] || [
+        {
+          title: 'Software Development Associate',
+          description: `Exciting opening at ${cName} for fresh graduates and early career developers.`,
+          location: 'Bengaluru, India',
+          salary: '6 - 9 LPA',
+          jobType: 'Full-time',
+          experience: '0 - 1 Year',
+          skills: ['JavaScript', 'React', 'Node.js', 'Problem Solving'],
+          openings: 3,
+        },
+      ];
+
+      for (const jobData of jobsToInsert) {
         const existingJob = await Job.findOne({
           title: jobData.title,
-          company: companyUser._id,
+          company: company._id,
         });
 
         if (!existingJob) {
           await Job.create({
             ...jobData,
-            company: companyUser._id,
-            companyName: companyName,
+            company: company._id,
+            companyName: cName,
             status: 'Active',
-            deadline: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000), // 60 days validity
+            deadline: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
           });
-          console.log(`💼 Seeded Job: "${jobData.title}" for ${companyName}`);
+          console.log(`💼 Seeded Job: "${jobData.title}" for ${cName}`);
         }
       }
     }
 
-    console.log('✅ All companies approved and demo jobs populated.');
+    console.log('✅ All companies approved and demo jobs populated successfully.');
   } catch (err) {
     console.error(`❌ Sync error: ${err.message}`);
   }
