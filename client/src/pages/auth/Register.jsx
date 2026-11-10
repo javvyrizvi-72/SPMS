@@ -65,9 +65,15 @@ const Register = () => {
       }
 
       const { data } = await registerUser(payload)
-      login(data, data.token)
-      toast.success('Account created successfully!')
-      navigate(getDashboardPath(data.role), { replace: true })
+
+      if (form.role === 'company') {
+        toast.success('Registration submitted! Awaiting Admin approval before you can post jobs.', { duration: 6000 })
+        navigate('/login', { replace: true })
+      } else {
+        login(data, data.token)
+        toast.success('Account created successfully!')
+        navigate(getDashboardPath(data.role), { replace: true })
+      }
     } catch (err) {
       const msg = getErrorMessage(err, 'Registration failed')
       setError(msg)

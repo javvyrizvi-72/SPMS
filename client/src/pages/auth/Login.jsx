@@ -4,16 +4,8 @@ import { useAuth } from '../../context/AuthContext'
 import { loginUser, getErrorMessage } from '../../services/api'
 import { getDashboardPath } from '../../utils/helpers'
 import toast from 'react-hot-toast'
-import { Eye, EyeOff, LogIn, GraduationCap, AlertCircle, Building2 } from 'lucide-react'
+import { Eye, EyeOff, LogIn, GraduationCap, AlertCircle } from 'lucide-react'
 import ServerStatus from '../../components/common/ServerStatus'
-
-const DEMO_COMPANIES = [
-  { name: 'CodeCraft Solutions', email: 'hr@codecraft.demo', password: 'Company@123' },
-  { name: 'TechCorp Solutions', email: 'hr@techcorp.demo', password: 'password123' },
-  { name: 'InnovateLabs', email: 'hr@innovatelabs.demo', password: 'password123' },
-  { name: 'CyberShield Security', email: 'hr@cybershield.demo', password: 'password123' },
-  { name: 'DataPulse Analytics', email: 'hr@datapulse.demo', password: 'password123' },
-]
 
 const Login = () => {
   const [form, setForm] = useState({ email: '', password: '' })
@@ -21,21 +13,12 @@ const Login = () => {
   const [loading, setLoading] = useState(false)
   const [slow, setSlow] = useState(false)
   const [error, setError] = useState('')
-  const [demoIndex, setDemoIndex] = useState(0)
   const { user, loading: authLoading, login } = useAuth()
   const navigate = useNavigate()
 
   useEffect(() => {
     if (!authLoading && user) navigate(getDashboardPath(user.role), { replace: true })
   }, [authLoading, user, navigate])
-
-  const handleCompanyDemoCycle = () => {
-    const current = DEMO_COMPANIES[demoIndex]
-    setForm({ email: current.email, password: current.password })
-    setError('')
-    toast.success(`Loaded Demo: ${current.name}`)
-    setDemoIndex((prev) => (prev + 1) % DEMO_COMPANIES.length)
-  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -137,18 +120,6 @@ const Login = () => {
             </button>
             {slow && <p className="text-xs text-gold-300 text-center">Waking up the server, the first sign-in can take up to a minute...</p>}
           </form>
-
-          <div className="mt-6">
-            <div className="grid grid-cols-1 gap-3">
-              <button 
-                type="button" 
-                onClick={handleCompanyDemoCycle}
-                className="flex items-center justify-center gap-2 py-2 rounded-lg border border-navy-600 text-sm text-navy-200 hover:border-gold-500/60 hover:text-gold-300 transition-colors"
-              >
-                <Building2 size={15} /> Company demo
-              </button>
-            </div>
-          </div>
 
           <div className="flex items-center gap-3 my-6">
             <div className="flex-1 h-px bg-navy-700" />
