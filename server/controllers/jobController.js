@@ -59,11 +59,13 @@ exports.createJob = async (req, res) => {
   }
 };
 
-// 2. Get All Active Jobs (Guaranteed fallback to show all jobs for every student)
+// 2. Get All Active Jobs (Strictly returns ONLY the 10 most recent jobs)
 exports.getAllJobs = async (req, res) => {
   try {
-    // Empty find {} ensures every single seeded/created job is fetched without filtering out
-    const rawJobs = await Job.find({}).sort({ createdAt: -1 }).lean();
+    const rawJobs = await Job.find({})
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
 
     // Attach resolved company name and safe structure
     const jobs = await Promise.all(
