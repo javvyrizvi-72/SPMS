@@ -9,10 +9,10 @@ const COLORS = ['#3B82F6', '#8B5CF6', '#F59E0B', '#10B981', '#06B6D4']
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
-    totalStudents: 6,
-    totalCompanies: 8,
-    activeJobs: 20,
-    totalApplications: 3,
+    totalStudents: 0,
+    totalCompanies: 0,
+    activeJobs: 0,
+    totalApplications: 0,
     studentsPlaced: 0,
     placementRate: 0,
   })
@@ -30,10 +30,11 @@ const Dashboard = () => {
         }
 
         const d = res?.data || {}
-        const totalStudents = d.totalStudents ?? d.students ?? 6
-        const totalCompanies = d.totalCompanies ?? d.companies ?? 8
-        const activeJobs = d.activeJobs ?? d.totalJobs ?? d.jobs ?? 20
-        const totalApplications = d.totalApplications ?? d.applications ?? 3
+        // Strict nullish coalescing: 0 ko respect karega, fallback nahi lagayega
+        const totalStudents = d.totalStudents ?? d.students ?? 0
+        const totalCompanies = d.totalCompanies ?? d.companies ?? 0
+        const activeJobs = d.activeJobs ?? d.totalJobs ?? d.jobs ?? 0
+        const totalApplications = d.totalApplications ?? d.applications ?? 0
         const studentsPlaced = d.studentsPlaced ?? d.placed ?? 0
         const placementRate = d.placementRate ?? (totalApplications ? Math.round((studentsPlaced / totalApplications) * 100) : 0)
 
@@ -46,7 +47,7 @@ const Dashboard = () => {
           placementRate,
         })
 
-        // Chart data setup for Pie Chart
+        // Recharts data
         setChartData([
           { name: 'Students', value: totalStudents },
           { name: 'Companies', value: totalCompanies },
@@ -55,14 +56,7 @@ const Dashboard = () => {
           { name: 'Placed', value: studentsPlaced },
         ])
       } catch (err) {
-        console.error('Stats error:', err)
-        setChartData([
-          { name: 'Students', value: 6 },
-          { name: 'Companies', value: 8 },
-          { name: 'Jobs', value: 20 },
-          { name: 'Applications', value: 3 },
-          { name: 'Placed', value: 0 },
-        ])
+        console.error('Stats fetch error:', err)
       } finally {
         setLoading(false)
       }
@@ -97,7 +91,7 @@ const Dashboard = () => {
           <p className="text-navy-400 mt-1">Platform overview and analytics</p>
         </div>
 
-        {/* Top 6 Stat Cards */}
+        {/* Top 6 Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {statCards.map((card, i) => {
             const Icon = card.icon
@@ -117,12 +111,12 @@ const Dashboard = () => {
           })}
         </div>
 
-        {/* Platform Overview with Pie Chart & Breakdown */}
+        {/* Platform Overview Pie Chart + Metric Rows */}
         <div className="card bg-navy-900/60 border border-navy-700/60 p-6 rounded-xl">
           <h3 className="text-lg font-semibold text-white mb-6">Platform Overview</h3>
           
           <div className="grid md:grid-cols-2 gap-8 items-center">
-            {/* Pie Chart */}
+            {/* Interactive Pie Chart */}
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -148,7 +142,7 @@ const Dashboard = () => {
               </ResponsiveContainer>
             </div>
 
-            {/* Metric List */}
+            {/* Metrics List */}
             <div className="space-y-4">
               <div className="flex justify-between items-center py-2 border-b border-navy-800/80 text-sm">
                 <span className="flex items-center gap-2 text-navy-300">
