@@ -30,13 +30,17 @@ const Dashboard = () => {
         }
 
         const d = res?.data || {}
-        // Strict nullish coalescing: 0 ko respect karega, fallback nahi lagayega
-        const totalStudents = d.totalStudents ?? d.students ?? 0
-        const totalCompanies = d.totalCompanies ?? d.companies ?? 0
-        const activeJobs = d.activeJobs ?? d.totalJobs ?? d.jobs ?? 0
-        const totalApplications = d.totalApplications ?? d.applications ?? 0
-        const studentsPlaced = d.studentsPlaced ?? d.placed ?? 0
-        const placementRate = d.placementRate ?? (totalApplications ? Math.round((studentsPlaced / totalApplications) * 100) : 0)
+        const totalStudents = Number(d.totalStudents ?? d.students ?? 0)
+        const totalCompanies = Number(d.totalCompanies ?? d.companies ?? 0)
+        const activeJobs = Number(d.activeJobs ?? d.totalJobs ?? d.jobs ?? 0)
+        const totalApplications = Number(d.totalApplications ?? d.applications ?? 0)
+        const studentsPlaced = Number(d.studentsPlaced ?? d.placed ?? 0)
+        const placementRate = Number(
+          d.placementRate ??
+            (totalApplications > 0
+              ? Math.round((studentsPlaced / totalApplications) * 100)
+              : 0)
+        )
 
         setStats({
           totalStudents,
@@ -47,14 +51,19 @@ const Dashboard = () => {
           placementRate,
         })
 
-        // Recharts data
-        setChartData([
+        const activePieValues = [
           { name: 'Students', value: totalStudents },
           { name: 'Companies', value: totalCompanies },
           { name: 'Jobs', value: activeJobs },
           { name: 'Applications', value: totalApplications },
           { name: 'Placed', value: studentsPlaced },
-        ])
+        ].filter((item) => item.value > 0)
+
+        setChartData(
+          activePieValues.length > 0
+            ? activePieValues
+            : [{ name: 'No Activity', value: 1 }]
+        )
       } catch (err) {
         console.error('Stats fetch error:', err)
       } finally {
@@ -91,7 +100,7 @@ const Dashboard = () => {
           <p className="text-navy-400 mt-1">Platform overview and analytics</p>
         </div>
 
-        {/* Top 6 Cards */}
+        {/* Top 6 Stat Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {statCards.map((card, i) => {
             const Icon = card.icon
@@ -111,10 +120,10 @@ const Dashboard = () => {
           })}
         </div>
 
-        {/* Platform Overview Pie Chart + Metric Rows */}
+        {/* Platform Overview with Pie Chart & Breakdown */}
         <div className="card bg-navy-900/60 border border-navy-700/60 p-6 rounded-xl">
           <h3 className="text-lg font-semibold text-white mb-6">Platform Overview</h3>
-          
+
           <div className="grid md:grid-cols-2 gap-8 items-center">
             {/* Interactive Pie Chart */}
             <div className="h-64 w-full">
