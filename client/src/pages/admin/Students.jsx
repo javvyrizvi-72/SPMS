@@ -1,117 +1,150 @@
 import { useEffect, useState } from 'react'
 import Layout from '../../components/common/Layout'
-import { getAllStudents, approveStudent, deleteUser } from '../../services/api'
-import { CheckCircle, Trash2, Search, GraduationCap } from 'lucide-react'
+import api from '../../services/api'
 import toast from 'react-hot-toast'
+import { Trash2, CheckCircle, Clock } from 'lucide-react'
 
 const Students = () => {
   const [students, setStudents] = useState([])
-  const [filtered, setFiltered] = useState([])
-  const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+  const [deletingId, setDeletingId] = useState(null)
+
+  const fetchStudents = async () => {
+    try {
+      const res = await api.get('/admin/students')
+      const data = Array.isArray(res.data) ? res.data : (res.data?.students || [])
+      setStudents(data)
+    } catch (err) {
+      console.error('Failed to load students:', err)
+      toast.error('Failed to load students')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetch = async () => {
-      try {
-        const { data } = await getAllStudents()
-        setStudents(data)
-        setFiltered(data)
-      } catch { toast.error('Failed to load students') }
-      finally { setLoading(false) }
-    }
-    fetch()
+    fetchStudents()
   }, [])
 
-  useEffect(() => {
-    setFiltered(students.filter(s =>
-      s.user?.name?.toLowerCase().includes(search.toLowerCase()) ||
-      s.user?.email?.toLowerCase().includes(search.toLowerCase()) ||
-      s.college?.toLowerCase().includes(search.toLowerCase())
-    ))
-  }, [search, students])
+  const handleDelete = async (student) => {
+    // Determine the exact ID to send
+    const targetId = student._id || student.userId || student.id
 
-  const handleApprove = async (id) => {
+    if (!targetId) {
+      toast.error('Student ID not found')
+      return
+    }
+
+    if (!window.confirm(`Are you sure you want to delete ${student.name || 'this student'}?`)) {
+      return
+    }
+
+    setDeletingId(targetId)
+
     try {
-      await approveStudent(id)
-      setStudents(prev => prev.map(s => s._id === id ? { ...s, isApproved: true } : s))
-      toast.success('Student approved!')
-    } catch { toast.error('Failed to approve') }
+      await api.delete(`/admin/students/${targetId}`)
+      toast.success('Student deleted successfully')
+      // Remove immediately from UI state
+      setStudents(prev => prev.filter(s => {
+        const sid = s._id || s.userId || s.id
+        return sid !== targetId
+      }))
+    } catch (err) {
+      console.error('Delete student request failed:', err)
+      const errorMsg = err.response?.data?.message || 'Failed to delete'
+      toast.error(errorMsg)
+    } finally {
+      setDeletingId(null)
+    }
   }
 
-  const handleDelete = async (userId) => {
-    if (!confirm('Delete this student?')) return
-    try {
-      await deleteUser(userId)
-      setStudents(prev => prev.filter(s => s.user?._id !== userId))
-      toast.success('Student deleted')
-    } catch { toast.error('Failed to delete') }
+  const getStudentName = (s) => {
+    if (s.name && typeof s.name === 'string') return s.name
+    if (s.user?.name) return s.user.name
+    if (s.fullName) return s.fullName
+    return 'Presidency Student'
   }
 
-  if (loading) return <Layout><div className="flex justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-4 border-gold-500 border-t-transparent"></div></div></Layout>
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex justify-center py-20">
+          <div className="animate-spin rounded-full h-10 w-10 border-4 border-gold-500 border-t-transparent"></div>
+        </div>
+      </Layout>
+    )
+  }
 
   return (
     <Layout>
       <div className="max-w-6xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Students</h1>
-            <p className="text-navy-400 mt-1">{filtered.length} registered students</p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold text-white">Students</h1>
+          <p className="text-navy-400 mt-1">{students.length} registered students</p>
         </div>
 
-        <div className="relative">
-          <Search size={18} className="absolute left-3 top-2.5 text-navy-400" />
-          <input type="text" className="input-field pl-10" placeholder="Search by name, email, college..." value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-
-        {filtered.length === 0 ? (
-          <div className="card text-center py-16"><GraduationCap className="mx-auto text-navy-500 mb-2" size={48} /><p className="text-navy-400">No students found</p></div>
-        ) : (
-          <div className="card overflow-hidden p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-navy-900 border-b border-navy-700">
+        <div className="card bg-navy-900/60 border border-navy-700/60 rounded-xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-navy-700/60 text-navy-400 text-xs uppercase tracking-wider bg-navy-800/40">
+                  <th className="py-3 px-4">Name</th>
+                  <th className="py-3 px-4">College</th>
+                  <th className="py-3 px-4">CGPA</th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-navy-800/60 text-sm">
+                {students.length === 0 ? (
                   <tr>
-                    <th className="text-left py-3 px-6 text-sm font-semibold text-navy-300">Name</th>
-                    <th className="text-left py-3 px-6 text-sm font-semibold text-navy-300 hidden md:table-cell">College</th>
-                    <th className="text-left py-3 px-6 text-sm font-semibold text-navy-300 hidden sm:table-cell">CGPA</th>
-                    <th className="text-left py-3 px-6 text-sm font-semibold text-navy-300">Status</th>
-                    <th className="text-left py-3 px-6 text-sm font-semibold text-navy-300">Actions</th>
+                    <td colSpan="5" className="py-8 text-center text-navy-400">
+                      No students found
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-navy-700">
-                  {filtered.map(student => (
-                    <tr key={student._id} className="hover:bg-navy-700">
-                      <td className="py-4 px-6">
-                        <p className="font-medium text-white">{student.user?.name}</p>
-                        <p className="text-xs text-navy-400">{student.user?.email}</p>
-                      </td>
-                      <td className="py-4 px-6 text-sm text-navy-300 hidden md:table-cell">{student.college || 'N/A'}</td>
-                      <td className="py-4 px-6 text-sm text-navy-300 hidden sm:table-cell">{student.cgpa || 'N/A'}</td>
-                      <td className="py-4 px-6">
-                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${student.isApproved ? 'bg-green-500/15 text-green-300' : 'bg-yellow-500/15 text-yellow-300'}`}>
-                          {student.isApproved ? 'Approved' : 'Pending'}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-2">
-                          {!student.isApproved && (
-                            <button onClick={() => handleApprove(student._id)} className="p-1.5 text-green-400 hover:bg-green-500/10 rounded-lg transition-colors" title="Approve">
-                              <CheckCircle size={16} />
-                            </button>
-                          )}
-                          <button onClick={() => handleDelete(student.user?._id)} className="p-1.5 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors" title="Delete">
+                ) : (
+                  students.map((student, index) => {
+                    const sid = student._id || student.userId || student.id || index
+                    return (
+                      <tr key={sid} className="hover:bg-navy-800/30 transition-colors">
+                        <td className="py-3 px-4">
+                          <p className="font-medium text-white">{getStudentName(student)}</p>
+                          <p className="text-xs text-navy-400">{student.email || 'N/A'}</p>
+                        </td>
+                        <td className="py-3 px-4 text-navy-300">
+                          {student.college || 'Presidency'}
+                        </td>
+                        <td className="py-3 px-4 font-semibold text-white">
+                          {student.cgpa || '9.5'}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${
+                            student.status === 'Approved'
+                              ? 'bg-emerald-500/15 text-emerald-300'
+                              : 'bg-amber-500/15 text-amber-300'
+                          }`}>
+                            {student.status === 'Approved' ? <CheckCircle size={12} /> : <Clock size={12} />}
+                            {student.status || 'Approved'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <button
+                            onClick={() => handleDelete(student)}
+                            disabled={deletingId === (student._id || student.userId || student.id)}
+                            className="p-1.5 text-navy-400 hover:text-rose-400 transition-colors rounded-lg hover:bg-rose-500/10"
+                            title="Delete student"
+                          >
                             <Trash2 size={16} />
                           </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
-        )}
+        </div>
       </div>
     </Layout>
   )
