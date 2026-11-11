@@ -1,185 +1,209 @@
-import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { LogOut, Bell, Menu, GraduationCap, CheckCheck } from 'lucide-react'
-import { useAuth } from '../../context/AuthContext'
-import { getNotifications, markNotificationRead } from '../../services/api'
-import { getInitials, timeAgoShort } from '../../utils/helpers'
+import { useState, useEffect, useRef } from 'react'
+import { Bell, Check, Trash2, X, ExternalLink, Clock } from 'lucide-react'
+import api from '../../services/api'
+import toast from 'react-hot-toast'
 
-const Navbar = ({ toggleSidebar }) => {
-  const { user, logout } = useAuth()
-  const navigate = useNavigate()
-  const [items, setItems] = useState([])
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
+const Notifications = () => {
+  const [notifications, setNotifications] = useState([])
+  const [isOpen, setIsOpen] = useState(false)
+  const [selectedNotif, setSelectedNotif] = useState(null)
+  const [unreadCount, setUnreadCount] = useState(0)
+  const dropdownRef = useRef(null)
 
-  const handleLogout = () => {
-    logout()
-    navigate('/login')
+  const fetchNotifications = async () => {
+    try {
+      const res = await api.get('/notifications')
+      const data = Array.isArray(res.data) ? res.data : (res.data?.notifications || [])
+      setNotifications(data)
+      setUnreadCount(data.filter(n => !n.isRead).length)
+    } catch (err) {
+      console.error('Failed to load notifications:', err)
+    }
   }
 
   useEffect(() => {
-    let alive = true
-    const load = async () => {
-      try {
-        const { data } = await getNotifications()
-        if (alive && Array.isArray(data)) setItems(data)
-      } catch { /* notifications optional */ }
-    }
-    load()
-    const id = setInterval(load, 10000)
-    return () => { alive = false; clearInterval(id) }
+    fetchNotifications()
+    const interval = setInterval(fetchNotifications, 25000)
+    return () => clearInterval(interval)
   }, [])
 
+  // Close dropdown on outside click
   useEffect(() => {
-    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
-    document.addEventListener('mousedown', close)
-    return () => document.removeEventListener('mousedown', close)
-  }, [])
-
-  const unread = items.filter((n) => !n.isRead).length
-
-  const handleNotificationClick = async (n) => {
-    if (!n.isRead) {
-      setItems((prev) => prev.map((x) => (x._id === n._id ? { ...x, isRead: true } : x)))
-      try { await markNotificationRead(n._id) } catch { /* ignore */ }
-    }
-
-    setOpen(false)
-
-    if (user?.role === 'admin') {
-      if (n.type === 'company_registration' || n.title?.includes('Company')) {
-        navigate('/admin/companies')
-      } else if (n.title?.includes('Student')) {
-        navigate('/admin/students')
-      } else {
-        navigate('/admin/applications')
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsOpen(false)
       }
-    } else if (user?.role === 'student') {
-      navigate('/student/applications')
-    } else if (user?.role === 'company') {
-      navigate('/company/applicants')
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const markAsRead = async (id) => {
+    try {
+      await api.put(`/notifications/${id}/read`)
+      setNotifications(prev =>
+        prev.map(n => n._id === id ? { ...n, isRead: true } : n)
+      )
+      setUnreadCount(prev => Math.max(0, prev - 1))
+    } catch (err) {
+      console.error(err)
     }
   }
 
-  const readAll = () => {
-    items.filter((n) => !n.isRead).forEach(async (n) => {
-      try { await markNotificationRead(n._id) } catch { /* ignore */ }
-    })
-    setItems((prev) => prev.map((x) => ({ ...x, isRead: true })))
+  const markAllAsRead = async () => {
+    try {
+      await api.put('/notifications/read-all')
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))
+      setUnreadCount(0)
+      toast.success('All marked as read')
+    } catch (err) {
+      toast.error('Failed to update')
+    }
   }
 
-  const handleProfileClick = () => {
-    if (user?.role === 'student') navigate('/student/profile')
-    else if (user?.role === 'company') navigate('/company/profile')
-    else if (user?.role === 'admin') navigate('/admin/profile')
+  const handleNotificationClick = (notif) => {
+    if (!notif.isRead) markAsRead(notif._id)
+    setSelectedNotif(notif)
+  }
+
+  const formatTime = (dateStr) => {
+    if (!dateStr) return 'Just now'
+    const diff = Math.floor((new Date() - new Date(dateStr)) / 1000)
+    if (diff < 60) return `${diff}s ago`
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+    return `${Math.floor(diff / 86400)}d ago`
   }
 
   return (
-    <header className="bg-navy-900/90 backdrop-blur border-b border-navy-700 px-4 sm:px-6 py-3 flex items-center justify-between sticky top-0 z-30">
-      <div className="flex items-center gap-3">
-        <button onClick={toggleSidebar} className="p-2 rounded-lg hover:bg-navy-700 transition-colors lg:hidden text-navy-200" aria-label="Open menu">
-          <Menu size={20} />
-        </button>
-        <div className="flex items-center gap-2 lg:hidden">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-gold-300 to-gold-600 flex items-center justify-center">
-            <GraduationCap size={18} className="text-navy-950" strokeWidth={2.5} />
-          </div>
-          <span className="font-extrabold gold-text tracking-wide">PLACEME</span>
-        </div>
-        <p className="hidden lg:block text-sm text-navy-300">
-          Smart Placement Management System
-        </p>
-      </div>
+    <div className="relative" ref={dropdownRef}>
+      {/* Bell Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="relative p-2 text-slate-300 hover:text-white hover:bg-slate-800/60 rounded-xl transition-all"
+        title="Notifications"
+      >
+        <Bell size={20} />
+        {unreadCount > 0 && (
+          <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-black shadow-lg">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
+      </button>
 
-      <div className="flex items-center gap-2 sm:gap-3">
-        {/* Notifications */}
-        <div className="relative" ref={ref}>
-          <button 
-            onClick={() => setOpen((o) => !o)} 
-            className="p-2 rounded-lg hover:bg-navy-700 relative text-navy-200 transition-colors" 
-            aria-label="Notifications"
-          >
-            <Bell size={18} />
-            {unread > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-gold-500 text-navy-950 text-[10px] font-bold flex items-center justify-center animate-pulse">
-                {unread > 9 ? '9+' : unread}
-              </span>
-            )}
-          </button>
-
-          {open && (
-            <div className="absolute right-0 mt-2 w-84 max-w-[85vw] bg-navy-800 border border-navy-600 rounded-xl shadow-card overflow-hidden animate-slide-up z-50">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-navy-700 bg-navy-900/50">
-                <span className="font-semibold text-white text-sm">Notifications</span>
-                {unread > 0 && (
-                  <button onClick={readAll} className="text-xs text-gold-400 hover:text-gold-300 flex items-center gap-1 font-medium transition-colors">
-                    <CheckCheck size={14} /> Mark all read
-                  </button>
-                )}
-              </div>
-              <div className="max-h-80 overflow-y-auto divide-y divide-navy-700/60">
-                {items.length === 0 ? (
-                  <p className="text-center text-sm text-navy-400 py-8">No notifications yet</p>
-                ) : items.map((n) => (
-                  <button 
-                    key={n._id} 
-                    onClick={() => handleNotificationClick(n)} 
-                    className={`w-full text-left px-4 py-3 hover:bg-navy-750 transition-colors ${n.isRead ? 'opacity-65' : 'bg-navy-700/20'}`}
-                  >
-                    <div className="flex items-start gap-2.5">
-                      {!n.isRead ? (
-                        <span className="mt-1.5 w-2 h-2 rounded-full bg-gold-500 shrink-0" />
-                      ) : (
-                        <span className="mt-1.5 w-2 h-2 rounded-full bg-transparent shrink-0" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-1">
-                          <p className="text-xs font-semibold text-white truncate">{n.title}</p>
-                          <span className="text-[10px] text-navy-400 shrink-0">{timeAgoShort(n.createdAt)}</span>
-                        </div>
-                        <p className="text-xs text-navy-300 mt-0.5 line-clamp-2">{n.message}</p>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
+      {/* Notifications Dropdown Panel */}
+      {isOpen && (
+        <div className="absolute right-0 mt-3 w-80 sm:w-96 md:w-[420px] rounded-2xl bg-[#0f172a] border border-slate-700/80 shadow-2xl z-50 overflow-hidden backdrop-blur-xl">
+          {/* Header */}
+          <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-white text-base">Notifications</h3>
+              {unreadCount > 0 && (
+                <span className="text-xs bg-amber-500/15 text-amber-300 px-2 py-0.5 rounded-full font-medium">
+                  {unreadCount} new
+                </span>
+              )}
             </div>
-          )}
-        </div>
-
-        {/* Clickable Profile Avatar */}
-        <button
-          type="button"
-          onClick={handleProfileClick}
-          className="flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-navy-800 transition-all text-left group"
-          title="Go to Profile"
-        >
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-gold-300 to-gold-600 flex items-center justify-center ring-2 ring-transparent group-hover:ring-gold-400/50 transition-all overflow-hidden shrink-0">
-            {user?.avatar ? (
-              <img src={user.avatar} alt={user?.name} className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-navy-950 text-sm font-bold">{getInitials(user?.name)}</span>
+            {unreadCount > 0 && (
+              <button
+                onClick={markAllAsRead}
+                className="text-xs text-amber-400 hover:text-amber-300 font-medium transition-colors"
+              >
+                Mark all read
+              </button>
             )}
           </div>
-          <div className="hidden sm:block">
-            <p className="text-sm font-semibold text-white leading-tight group-hover:text-gold-300 transition-colors">
-              {user?.name}
-            </p>
-            <p className="text-xs text-gold-400 capitalize">{user?.role}</p>
-          </div>
-        </button>
 
-        {/* Logout */}
-        <button 
-          onClick={handleLogout} 
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-300 hover:bg-red-500/10 rounded-lg transition-colors font-medium"
-        >
-          <LogOut size={16} />
-          <span className="hidden sm:block">Logout</span>
-        </button>
-      </div>
-    </header>
+          {/* List */}
+          <div className="max-h-[380px] overflow-y-auto divide-y divide-slate-800/60">
+            {notifications.length === 0 ? (
+              <div className="p-8 text-center text-slate-400">
+                <Bell size={32} className="mx-auto mb-2 text-slate-600 opacity-60" />
+                <p className="text-sm">No notifications yet</p>
+              </div>
+            ) : (
+              notifications.map((notif) => (
+                <div
+                  key={notif._id}
+                  onClick={() => handleNotificationClick(notif)}
+                  className={`p-4 cursor-pointer transition-all hover:bg-slate-800/40 flex gap-3 items-start ${
+                    !notif.isRead ? 'bg-amber-500/5' : ''
+                  }`}
+                >
+                  <div className="text-xl mt-0.5 select-none">
+                    {notif.type === 'application' ? '📄' : notif.type === 'status_update' ? '🎯' : '🎓'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <p className={`text-sm font-semibold leading-tight ${!notif.isRead ? 'text-white' : 'text-slate-300'}`}>
+                        {notif.title || 'New Notification'}
+                      </p>
+                      <span className="text-[11px] text-slate-400 flex items-center gap-1 whitespace-nowrap">
+                        <Clock size={11} />
+                        {formatTime(notif.createdAt)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed break-words line-clamp-2">
+                      {notif.message}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Full Detail Modal (Opens when any notification is clicked) */}
+      {selectedNotif && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0f172a] border border-slate-700/80 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">
+                  {selectedNotif.type === 'application' ? '📄' : selectedNotif.type === 'status_update' ? '🎯' : '🎓'}
+                </span>
+                <div>
+                  <h3 className="text-lg font-bold text-white">{selectedNotif.title}</h3>
+                  <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                    <Clock size={12} /> {new Date(selectedNotif.createdAt).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedNotif(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Complete Uncut Notification Message */}
+            <div className="bg-slate-900/90 border border-slate-800/80 rounded-xl p-4 text-sm text-slate-200 leading-relaxed whitespace-pre-line break-words max-h-64 overflow-y-auto">
+              {selectedNotif.message}
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              {selectedNotif.link && (
+                <a
+                  href={selectedNotif.link}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-xl text-sm flex items-center gap-1.5 transition-colors"
+                >
+                  Go to Action <ExternalLink size={14} />
+                </a>
+              )}
+              <button
+                onClick={() => setSelectedNotif(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-sm font-medium transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
-export default Navbar
+export default Notifications
