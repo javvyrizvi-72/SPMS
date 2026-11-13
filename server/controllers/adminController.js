@@ -60,7 +60,7 @@ const computeStats = async () => {
 
   try {
     const statusCounts = await Application.aggregate([
-      { $group: { _id: '$status', count: {$sum: 1 } } },
+      { $group: { _id: '$status', count: { $sum: 1 } } },
     ]);
     statusCounts.forEach((s) => {
       const key = s._id || 'Applied';
@@ -73,7 +73,7 @@ const computeStats = async () => {
   let recentApplications = [];
   try {
     const rawApps = await Application.find({})
-      .populate('job', 'title companyName')
+      .populate('job')
       .populate({
         path: 'student',
         populate: { path: 'user', select: 'name email' },
@@ -93,8 +93,10 @@ const computeStats = async () => {
             studentEmail = app.student.user.email;
           } else if (app.student.name) {
             studentName = app.student.name;
+            studentEmail = app.student.email || '';
           } else if (app.student.fullName) {
             studentName = app.student.fullName;
+            studentEmail = app.student.email || '';
           } else {
             const u = await User.findById(app.student).lean();
             if (u) {
@@ -104,12 +106,31 @@ const computeStats = async () => {
           }
         }
 
+        // Resolve Exact Company Name
+        let compName = app.job?.companyName;
+        if (!compName && app.job?.company) {
+          if (Company) {
+            const compDoc = await Company.findById(app.job.company).lean();
+            if (compDoc) compName = compDoc.companyName || compDoc.name;
+          }
+          if (!compName && User) {
+            const userDoc = await User.findById(app.job.company).lean();
+            if (userDoc) compName = userDoc.companyName || userDoc.name;
+          }
+        }
+        if (!compName && app.job?.createdBy && User) {
+          const userDoc = await User.findById(app.job.createdBy).lean();
+          if (userDoc) compName = userDoc.companyName || userDoc.name;
+        }
+
+        const cleanCompanyName = (compName || 'Company').replace(/ Recruiter/i, '').trim();
+
         return {
           _id: app._id,
           studentName,
           studentEmail,
           jobTitle: app.job?.title || 'Job Listing',
-          companyName: app.job?.companyName || 'Company',
+          companyName: cleanCompanyName,
           status: app.status || 'Applied',
           appliedAt: app.appliedAt || app.createdAt || new Date(),
         };
@@ -149,7 +170,7 @@ const computeStats = async () => {
   };
 };
 
-// 1. Get Dashboard Overview & Reports Stats (Both use computeStats)
+// 1. Get Dashboard Overview & Reports Stats
 exports.getDashboardStats = async (req, res) => {
   try {
     const stats = await computeStats();
@@ -160,55 +181,77 @@ exports.getDashboardStats = async (req, res) => {
   }
 };
 
-// 2. Get All Students (Never throws "Failed to load students")
+// 2. Get All Students (Merges User accounts + Student profile records)
 exports.getAllStudents = async (req, res) => {
   try {
-    let students = [];
+    const userDocs = await User.find({ role: 'student' })
+      .select('-password')
+      .sort({ createdAt: -1 })
+      .lean();
 
-    // Check Student collection first
+    let studentProfiles = [];
     if (Student) {
       try {
-        const studentDocs = await Student.find({})
-          .populate('user', 'name email isApproved status createdAt')
-          .sort({ createdAt: -1 })
-          .lean();
-
-        if (studentDocs && studentDocs.length > 0) {
-          students = studentDocs.map((s) => ({
-            _id: s._id ? s._id.toString() : '',
-            userId: s.user?._id ? s.user._id.toString() : (s.user ? s.user.toString() : ''),
-            name: s.user?.name || s.name || s.fullName || 'Student',
-            email: s.user?.email || s.email || 'student@placeme.demo',
-            college: s.college || s.university || 'Presidency',
-            cgpa: s.cgpa || s.gpa || 7.5,
-            status: s.status || (s.user?.isApproved !== false ? 'Approved' : 'Pending'),
-            createdAt: s.createdAt || new Date(),
-          }));
-        }
+        studentProfiles = await Student.find({}).lean();
       } catch (err) {
         console.warn('Student profile query warning:', err.message);
       }
     }
 
-    // Fallback: If student collection has 0, fetch from User collection directly
-    if (students.length === 0) {
-      const userDocs = await User.find({ role: 'student' }).sort({ createdAt: -1 }).lean();
-      students = userDocs.map((u) => ({
-        _id: u._id.toString(),
-        userId: u._id.toString(),
-        name: u.name || 'Student',
-        email: u.email || 'student@placeme.demo',
-        college: 'Presidency',
-        cgpa: 7.5,
-        status: u.isApproved !== false ? 'Approved' : 'Pending',
-        createdAt: u.createdAt || new Date(),
-      }));
+    const profileByUserMap = new Map();
+    const profileByIdMap = new Map();
+
+    studentProfiles.forEach((sp) => {
+      if (sp.user) profileByUserMap.set(sp.user.toString(), sp);
+      if (sp._id) profileByIdMap.set(sp._id.toString(), sp);
+    });
+
+    const studentList = [];
+    const processedUserIds = new Set();
+    const processedProfileIds = new Set();
+
+    for (const u of userDocs) {
+      const uId = u._id.toString();
+      processedUserIds.add(uId);
+
+      const sp = profileByUserMap.get(uId) || {};
+      if (sp._id) processedProfileIds.add(sp._id.toString());
+
+      studentList.push({
+        _id: sp._id ? sp._id.toString() : uId,
+        userId: uId,
+        name: u.name || sp.name || sp.fullName || 'Student',
+        email: u.email || sp.email || 'student@placeme.demo',
+        college: sp.college || sp.university || sp.department || 'Presidency',
+        cgpa: sp.cgpa !== undefined ? sp.cgpa : (sp.gpa !== undefined ? sp.gpa : 7.5),
+        status: sp.status || (u.isApproved !== false ? 'Approved' : 'Pending'),
+        isApproved: u.isApproved !== false,
+        createdAt: sp.createdAt || u.createdAt || new Date(),
+      });
     }
 
-    res.json(students);
+    for (const sp of studentProfiles) {
+      const spId = sp._id ? sp._id.toString() : '';
+      const linkedUserId = sp.user ? sp.user.toString() : '';
+
+      if (!processedProfileIds.has(spId) && (!linkedUserId || !processedUserIds.has(linkedUserId))) {
+        studentList.push({
+          _id: spId,
+          userId: linkedUserId || spId,
+          name: sp.name || sp.fullName || 'Student',
+          email: sp.email || 'student@placeme.demo',
+          college: sp.college || sp.university || sp.department || 'Presidency',
+          cgpa: sp.cgpa !== undefined ? sp.cgpa : (sp.gpa !== undefined ? sp.gpa : 7.5),
+          status: sp.status || 'Approved',
+          isApproved: sp.status === 'Approved',
+          createdAt: sp.createdAt || new Date(),
+        });
+      }
+    }
+
+    res.json(studentList);
   } catch (error) {
     console.error('Get all students error:', error);
-    // Return empty array instead of 500 error to prevent frontend crash
     res.json([]);
   }
 };
@@ -294,6 +337,7 @@ exports.updateStudentStatus = async (req, res) => {
       const st = await Student.findById(rawId);
       if (st) {
         st.status = status || 'Approved';
+        st.isApproved = isApproved !== undefined ? isApproved : status === 'Approved';
         await st.save();
         if (st.user) targetUserId = st.user.toString();
       }

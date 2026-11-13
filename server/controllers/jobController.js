@@ -92,13 +92,15 @@ exports.getAllJobs = async (req, res) => {
           if (userDoc) compName = userDoc.companyName || userDoc.name;
         }
 
+        const cleanName = (compName || 'Top Tech Company').replace(/ Recruiter/i, '').trim();
+
         jobs.push({
           ...j,
-          companyName: compName || 'Top Tech Company',
+          companyName: cleanName,
           company: {
             _id: j.company,
-            companyName: compName || 'Top Tech Company',
-            name: compName || 'Top Tech Company',
+            companyName: cleanName,
+            name: cleanName,
           },
         });
       }
@@ -124,11 +126,13 @@ exports.getJobById = async (req, res) => {
       if (u) compName = u.companyName || u.name;
     }
 
-    job.companyName = compName || 'Top Tech Company';
+    const cleanName = (compName || 'Top Tech Company').replace(/ Recruiter/i, '').trim();
+
+    job.companyName = cleanName;
     job.company = {
       _id: job.company,
-      companyName: compName || 'Top Tech Company',
-      name: compName || 'Top Tech Company',
+      companyName: cleanName,
+      name: cleanName,
     };
 
     res.json(job);
@@ -178,14 +182,12 @@ exports.getCompanyJobs = async (req, res) => {
       queryFilters.push({ companyId: companyProfileId });
     }
 
-    // Agar seed data company name ke through set tha (jaise "Amazon")
     if (userOrgName) {
       queryFilters.push({
         companyName: { $regex: new RegExp(userOrgName, 'i') }
       });
     }
 
-    // Company model se match check karo agar profile alag ID par ho
     if (Company) {
       const compDoc = await Company.findOne({
         $or: [{ user: userId }, { name: { $regex: new RegExp(userOrgName, 'i') } }]
@@ -205,7 +207,7 @@ exports.getCompanyJobs = async (req, res) => {
   }
 };
 
-// 7. Student Apply For Job (With Recruiter & Student Notifications)
+// 7. Student Apply For Job
 exports.applyForJob = async (req, res) => {
   try {
     const jobId = req.params.id;
@@ -264,7 +266,6 @@ exports.applyForJob = async (req, res) => {
           isRead: false,
           createdAt: new Date(),
         });
-        console.log(`🔔 Notification created for recruiter: ${recruiterUserId}`);
       } catch (nErr) {
         console.error('Notification creation error:', nErr.message);
       }
@@ -295,7 +296,7 @@ exports.applyForJob = async (req, res) => {
   }
 };
 
-// 8. Get Applications for Current Student
+// 8. Get Applications for Current Student (Resolves Company Name cleanly)
 exports.getMyApplications = async (req, res) => {
   try {
     const studentId = req.user.studentId || req.user.id || req.user._id;
@@ -311,9 +312,48 @@ exports.getMyApplications = async (req, res) => {
       }
     }
 
-    const applications = await Application.find({ $or: queryConditions })
+    const rawApplications = await Application.find({ $or: queryConditions })
       .populate('job')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const applications = await Promise.all(
+      rawApplications.map(async (app) => {
+        if (!app.job) return app;
+
+        let compName = app.job.companyName;
+        if (!compName && app.job.company) {
+          if (Company) {
+            const compDoc = await Company.findById(app.job.company).lean();
+            if (compDoc) compName = compDoc.companyName || compDoc.name;
+          }
+          if (!compName && User) {
+            const userDoc = await User.findById(app.job.company).lean();
+            if (userDoc) compName = userDoc.companyName || userDoc.name;
+          }
+        }
+
+        if (!compName && app.job.createdBy && User) {
+          const userDoc = await User.findById(app.job.createdBy).lean();
+          if (userDoc) compName = userDoc.companyName || userDoc.name;
+        }
+
+        const cleanName = (compName || 'Company').replace(/ Recruiter/i, '').trim();
+
+        return {
+          ...app,
+          job: {
+            ...app.job,
+            companyName: cleanName,
+            company: {
+              _id: app.job.company,
+              companyName: cleanName,
+              name: cleanName,
+            },
+          },
+        };
+      })
+    );
 
     res.json(applications);
   } catch (error) {

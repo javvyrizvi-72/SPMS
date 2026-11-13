@@ -189,19 +189,7 @@ const TEN_JOBS = {
 
 const setupClean5Companies10Jobs = async () => {
   try {
-    // 1. Wipe non-admin users, company profiles, and existing jobs
-    await User.deleteMany({ role: { $ne: 'admin' } });
-    if (Company) {
-      await Company.deleteMany({});
-    } else if (mongoose.connection.collections['companies']) {
-      await mongoose.connection.collections['companies'].deleteMany({});
-    }
-
-    if (mongoose.connection.collections['jobs']) {
-      await mongoose.connection.collections['jobs'].deleteMany({});
-    }
-
-    // 2. Super Admin Ensure
+    // 1. Ensure Super Admin
     let admin = await User.findOne({ email: ADMIN_EMAIL });
     if (!admin) {
       admin = new User({
@@ -214,43 +202,37 @@ const setupClean5Companies10Jobs = async () => {
       await admin.save();
     }
 
-    // 3. Create Companies and store both User ID and Company Profile ID
+    // 2. Ensure Companies exist
     const companyLookup = {};
 
     for (const cData of COMPANIES_DATA) {
-      const companyUser = new User(cData);
-      await companyUser.save();
+      let companyUser = await User.findOne({ email: cData.email });
+      if (!companyUser) {
+        companyUser = new User(cData);
+        await companyUser.save();
+      } else {
+        companyUser.password = cData.password;
+        await companyUser.save();
+      }
 
       let companyDocId = companyUser._id;
 
       if (Company) {
-        const compDoc = await Company.create({
-          user: companyUser._id,
-          name: cData.companyName,
-          companyName: cData.companyName,
-          email: cData.email,
-          website: cData.website,
-          industry: cData.industry,
-          location: cData.location,
-          isApproved: true,
-          status: 'approved',
-        });
+        let compDoc = await Company.findOne({ user: companyUser._id });
+        if (!compDoc) {
+          compDoc = await Company.create({
+            user: companyUser._id,
+            name: cData.companyName,
+            companyName: cData.companyName,
+            email: cData.email,
+            website: cData.website,
+            industry: cData.industry,
+            location: cData.location,
+            isApproved: true,
+            status: 'approved',
+          });
+        }
         companyDocId = compDoc._id;
-      } else if (mongoose.connection.collections['companies']) {
-        const insertRes = await mongoose.connection.collections['companies'].insertOne({
-          user: companyUser._id,
-          name: cData.companyName,
-          companyName: cData.companyName,
-          email: cData.email,
-          website: cData.website,
-          industry: cData.industry,
-          location: cData.location,
-          isApproved: true,
-          status: 'approved',
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-        companyDocId = insertRes.insertedId;
       }
 
       companyLookup[cData.companyName] = {
@@ -259,37 +241,45 @@ const setupClean5Companies10Jobs = async () => {
       };
     }
 
-    // 4. Create Jobs with cross-linked IDs (Maps to both User ID and Company Model ID)
+    // 3. Ensure exact 10 initial jobs exist (Never duplicate on restart)
     for (const [cName, jobs] of Object.entries(TEN_JOBS)) {
       const info = companyLookup[cName];
+      if (!info) continue;
+
       for (const j of jobs) {
-        await Job.create({
+        const existingJob = await Job.findOne({
           title: j.title,
-          description: j.description,
-          location: j.location,
-          salary: j.salary,
-          jobType: j.jobType,
-          eligibility: {
+          $or: [{ createdBy: info.userId }, { company: info.companyDocId }],
+        });
+
+        if (!existingJob) {
+          await Job.create({
+            title: j.title,
+            description: j.description,
+            location: j.location,
+            salary: j.salary,
+            jobType: j.jobType,
+            eligibility: {
+              minCgpa: j.minCgpa,
+              requiredDegree: j.requiredDegree,
+              branches: j.branches,
+            },
             minCgpa: j.minCgpa,
             requiredDegree: j.requiredDegree,
-            branches: j.branches,
-          },
-          minCgpa: j.minCgpa,
-          requiredDegree: j.requiredDegree,
-          branch: j.branches.join(', '),
-          // Dono fields pass karo taaki chahe controller user._id dhoonde ya company._id, match ho jaye:
-          company: info.companyDocId,
-          companyId: info.companyDocId,
-          createdBy: info.userId,
-          user: info.userId,
-          companyName: cName,
-          status: 'Active',
-          deadline: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000),
-        });
+            branch: j.branches.join(', '),
+            company: info.companyDocId,
+            companyId: info.companyDocId,
+            createdBy: info.userId,
+            user: info.userId,
+            companyName: cName,
+            status: 'Active',
+            deadline: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000),
+          });
+        }
       }
     }
 
-    console.log('🎯 DUAL LINKING COMPLETE: Jobs now correctly linked to Company Profiles!');
+    console.log('✅ All 5 company accounts & 10 jobs verified.');
   } catch (err) {
     console.error('❌ Sync error:', err.message);
   }

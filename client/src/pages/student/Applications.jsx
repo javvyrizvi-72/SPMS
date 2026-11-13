@@ -13,12 +13,25 @@ const Applications = () => {
     const fetch = async () => {
       try {
         const { data } = await getMyApplications()
-        setApplications(data)
+        const list = Array.isArray(data) ? data : (data?.applications || data?.data || [])
+        setApplications(list)
       } catch { toast.error('Failed to load applications') }
       finally { setLoading(false) }
     }
     fetch()
   }, [])
+
+  const getCompanyName = (app) => {
+    return (
+      app?.job?.companyName ||
+      app?.job?.company?.companyName ||
+      app?.job?.company?.name ||
+      app?.job?.createdBy?.companyName ||
+      app?.job?.createdBy?.name?.replace(' Recruiter', '') ||
+      app?.companyName ||
+      'N/A'
+    )
+  }
 
   if (loading) return <Layout><div className="flex justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-4 border-gold-500 border-t-transparent"></div></div></Layout>
 
@@ -56,8 +69,8 @@ const Applications = () => {
                         <span className="font-medium text-white text-sm">{app.job?.title || 'N/A'}</span>
                       </div>
                     </td>
-                    <td className="py-4 px-6 text-sm text-navy-300 hidden sm:table-cell">{app.job?.company?.companyName || 'N/A'}</td>
-                    <td className="py-4 px-6 text-sm text-navy-400 hidden md:table-cell">{formatDate(app.appliedAt)}</td>
+                    <td className="py-4 px-6 text-sm text-navy-300 hidden sm:table-cell">{getCompanyName(app)}</td>
+                    <td className="py-4 px-6 text-sm text-navy-400 hidden md:table-cell">{formatDate(app.appliedAt || app.createdAt)}</td>
                     <td className="py-4 px-6">
                       <span className={getStatusBadge(app.status)}>{app.status}</span>
                     </td>

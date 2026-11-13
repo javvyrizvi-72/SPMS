@@ -29,19 +29,8 @@ if (!fs.existsSync(uploadsDir)) {
   console.log("📁 Created uploads directory successfully");
 }
 
-connectDB().then(async () => {
-  if (process.env.SEED_ON_START === "true") {
-    try {
-      const { seedSampleData } = require("./seed/sampleData");
-      const r = await seedSampleData((m) => console.log("seed:", m));
-      console.log(
-        `Sample data ready (new: ${r.users} users, ${r.jobs} jobs, removed demo students: ${r.removedStudents})`,
-      );
-    } catch (e) {
-      console.error("Seeding failed:", e.message);
-    }
-  }
-});
+// Connect Database (Only runs safe 5-companies / 10-jobs sync)
+connectDB();
 
 const app = express();
 app.set("trust proxy", 1);
@@ -56,7 +45,7 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 // Serve local uploads folder for resumes
 app.use("/uploads", express.static(uploadsDir));
 
-// Safe Route Loader Helper: Agar koi route router na ho toh crash hone se bachaye
+// Safe Route Loader Helper
 const safeUse = (routePath, modulePath) => {
   try {
     const mod = require(modulePath);

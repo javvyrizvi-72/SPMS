@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import Layout from '../../components/common/Layout'
 import api from '../../services/api'
-import toast from 'react-hot-toast'
 import {
   Users,
   Building2,
@@ -31,14 +30,14 @@ const STATUS_COLORS = {
 
 const Reports = () => {
   const [data, setData] = useState({
-    totalStudents: 6,
+    totalStudents: 0,
     totalCompanies: 5,
     totalJobsPosted: 10,
-    totalApplications: 11,
+    totalApplications: 0,
     studentsPlaced: 0,
     placementRate: 0,
     statusDistribution: {
-      Applied: 11,
+      Applied: 0,
       Shortlisted: 0,
       Interview: 0,
       Selected: 0,
@@ -60,10 +59,10 @@ const Reports = () => {
         }
 
         const d = res?.data || {}
-        const totalStudents = d.totalStudents ?? d.students ?? 6
+        const totalStudents = d.totalStudents ?? d.students ?? 0
         const totalCompanies = d.totalCompanies ?? d.companies ?? 5
         const totalJobs = d.totalJobsPosted ?? d.totalJobs ?? d.jobs ?? 10
-        const totalApplications = d.totalApplications ?? d.applications ?? 11
+        const totalApplications = d.totalApplications ?? d.applications ?? 0
         const studentsPlaced = d.studentsPlaced ?? d.placed ?? 0
         const placementRate =
           d.placementRate ??
@@ -72,7 +71,7 @@ const Reports = () => {
             : 0)
 
         const dist = d.statusDistribution || d.distribution || {
-          Applied: totalApplications || 11,
+          Applied: totalApplications || 0,
           Shortlisted: 0,
           Interview: 0,
           Selected: studentsPlaced || 0,
@@ -103,14 +102,6 @@ const Reports = () => {
         ])
       } catch (err) {
         console.error('Reports load error:', err)
-        // Fallback default safe figures
-        setChartData([
-          { status: 'Applied', count: 11 },
-          { status: 'Shortlisted', count: 0 },
-          { status: 'Interview', count: 0 },
-          { status: 'Selected', count: 0 },
-          { status: 'Rejected', count: 0 },
-        ])
       } finally {
         setLoading(false)
       }
@@ -208,7 +199,8 @@ const Reports = () => {
               <thead>
                 <tr className="border-b border-navy-700/60 text-navy-400 text-xs uppercase tracking-wider bg-navy-800/40">
                   <th className="py-3 px-4">Student</th>
-                  <th className="py-3 px-4">Job</th>
+                  <th className="py-3 px-4">Job Role</th>
+                  <th className="py-3 px-4">Company</th>
                   <th className="py-3 px-4">Applied</th>
                   <th className="py-3 px-4">Status</th>
                 </tr>
@@ -216,7 +208,7 @@ const Reports = () => {
               <tbody className="divide-y divide-navy-800/60 text-sm">
                 {data.recentApplications.length === 0 ? (
                   <tr>
-                    <td colSpan="4" className="py-8 text-center text-navy-400">
+                    <td colSpan="5" className="py-8 text-center text-navy-400">
                       No recent applications found
                     </td>
                   </tr>
@@ -229,7 +221,12 @@ const Reports = () => {
                       </td>
                       <td className="py-3 px-4">
                         <p className="text-white font-medium">{app.jobTitle}</p>
-                        <p className="text-xs text-gold-400">{app.companyName}</p>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs font-medium">
+                          <Building2 size={12} />
+                          {app.companyName}
+                        </span>
                       </td>
                       <td className="py-3 px-4 text-navy-400 text-xs">
                         {formatDate(app.appliedAt)}
