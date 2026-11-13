@@ -22,54 +22,41 @@ const authResponse = (user) => ({
   token: generateToken(user._id),
 });
 
-// Dedicated Zero-Friction Mail Dispatcher
+// Non-blocking Mail Dispatcher with strict 5s timeout so API never hangs
 const sendOtpEmail = async (userEmail, otp, userName) => {
-  const emailHtml = `
-    <div style="font-family: Arial, sans-serif; background-color: #0b192c; padding: 24px; color: #ffffff; border-radius: 12px; max-width: 480px; margin: auto;">
-      <h2 style="color: #fbbf24; margin-bottom: 8px;">PlaceMe Portal</h2>
-      <p style="color: #cbd5e1; font-size: 14px;">Hello ${userName || 'User'},</p>
-      <p style="color: #94a3b8; font-size: 14px;">You requested a password reset. Use this OTP to verify your account:</p>
-      <div style="background-color: #1e293b; padding: 16px; border-radius: 8px; text-align: center; margin: 20px 0;">
-        <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #fbbf24;">${otp}</span>
-      </div>
-      <p style="color: #94a3b8; font-size: 12px;">This OTP is valid for 10 minutes. If you did not request this, please ignore this email.</p>
-    </div>
-  `;
+  console.log('\n======================================================');
+  console.log(`⚡ [OTP GENERATED]: >>> ${otp} <<< for ${userName || 'User'} (${userEmail})`);
+  console.log('======================================================\n');
 
   try {
-    const testAccount = await nodemailer.createTestAccount();
-    const testTransporter = nodemailer.createTransport({
-      host: testAccount.smtp.host,
-      port: testAccount.smtp.port,
-      secure: testAccount.smtp.secure,
+    const hasRealSmtp =
+      process.env.EMAIL_USER &&
+      process.env.EMAIL_PASS &&
+      !process.env.EMAIL_USER.includes('your_email');
+
+    if (!hasRealSmtp) return;
+
+    const transporter = nodemailer.createTransport({
+      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+      port: Number(process.env.EMAIL_PORT) || 587,
+      secure: false,
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
+      socketTimeout: 5000,
       auth: {
-        user: testAccount.user,
-        pass: testAccount.pass,
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
       },
     });
 
-    const info = await testTransporter.sendMail({
-      from: '"PlaceMe Security" <security@placeme.portal>',
+    await transporter.sendMail({
+      from: `"PlaceMe Security" <${process.env.EMAIL_USER}>`,
       to: userEmail,
       subject: `Your Password Reset OTP: ${otp}`,
-      html: emailHtml,
+      html: `<div style="font-family: Arial, sans-serif; padding: 20px;"><h2>PlaceMe Password Reset</h2><p>Hello ${userName || 'User'}, your OTP is: <strong>${otp}</strong> (valid for 10 minutes).</p></div>`,
     });
-
-    const previewUrl = nodemailer.getTestMessageUrl(info);
-
-    console.log('\n======================================================');
-    console.log('⚡ [OTP DISPATCHED SUCCESSFULLY]');
-    console.log(`👤 Recipient: ${userName || 'User'} (${userEmail})`);
-    console.log(`🔑 Real OTP:  >>> ${otp} <<<`);
-    console.log(`⏰ Expiry:    10 Minutes`);
-    if (previewUrl) {
-      console.log(`🔗 Web Inbox: ${previewUrl}`);
-    }
-    console.log('======================================================\n');
   } catch (err) {
-    console.log('\n======================================================');
-    console.log(`⚡ [DIRECT FALLBACK OTP]: >>> ${otp} <<< for ${userEmail}`);
-    console.log('======================================================\n');
+    console.error('SMTP delivery skipped/failed:', err.message);
   }
 };
 
@@ -209,7 +196,7 @@ const updateProfile = async (req, res) => {
   }
 };
 
-// 1. Request OTP for Forgot Password
+// 1. Request OTP for Forgot Password (Instantaneous)
 const forgotPassword = async (req, res) => {
   try {
     const email = String(req.body.email || '').trim().toLowerCase();
@@ -227,9 +214,13 @@ const forgotPassword = async (req, res) => {
     user.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
     await user.save();
 
-    await sendOtpEmail(user.email, otp, user.name);
+    // Fire and forget so API responds immediately
+    sendOtpEmail(user.email, otp, user.name);
 
-    res.json({ message: `Password reset OTP has been sent for ${user.email}` });
+    res.json({
+      message: `Verification OTP generated for ${user.email}`,
+      otp,
+    });
   } catch (error) {
     console.error('Forgot password error:', error.message);
     res.status(500).json({ message: 'Failed to process forgot password request' });

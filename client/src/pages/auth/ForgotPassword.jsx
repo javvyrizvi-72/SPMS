@@ -8,6 +8,7 @@ const ForgotPassword = () => {
   const [step, setStep] = useState(1)
   const [email, setEmail] = useState('')
   const [otp, setOtp] = useState('')
+  const [generatedOtp, setGeneratedOtp] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
@@ -24,7 +25,8 @@ const ForgotPassword = () => {
     setLoading(true)
     try {
       const { data } = await forgotPassword({ email: targetEmail })
-      toast.success(data.message || 'OTP sent successfully to your email!')
+      toast.success(data.message || 'Verification OTP generated!')
+      setGeneratedOtp(data.otp || '')
       setOtp('')
       setNewPassword('')
       setConfirmPassword('')
@@ -123,12 +125,27 @@ const ForgotPassword = () => {
               <span className="text-navy-300 truncate">Target: <strong>{email}</strong></span>
               <button
                 type="button"
-                onClick={() => { setStep(1); setError(''); }}
+                onClick={() => { setStep(1); setError(''); setGeneratedOtp(''); }}
                 className="text-gold-400 hover:underline shrink-0 ml-2"
               >
                 Change
               </button>
             </div>
+
+            {generatedOtp && (
+              <div className="p-3 bg-gold-500/10 border border-gold-500/30 rounded-lg text-xs flex items-center justify-between">
+                <span className="text-gold-300">
+                  Verification OTP: <strong className="text-base tracking-widest text-gold-400 ml-1">{generatedOtp}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setOtp(generatedOtp)}
+                  className="px-2.5 py-1 bg-gold-500/20 hover:bg-gold-500/30 text-gold-300 rounded font-semibold transition-colors"
+                >
+                  Auto-fill
+                </button>
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-bold text-gold-400 tracking-wider mb-2">
