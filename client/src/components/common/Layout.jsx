@@ -20,12 +20,14 @@ const Layout = ({ children }) => {
     { name: 'Students', path: '/admin/students', icon: Users },
     { name: 'Companies', path: '/admin/companies', icon: Building2 },
     { name: 'Reports', path: '/admin/reports', icon: FileText },
+    { name: 'Profile', path: '/admin/profile', icon: User },
   ];
 
   const companyNav = [
     { name: 'Dashboard', path: '/company/dashboard', icon: LayoutDashboard },
     { name: 'Post Job', path: '/company/post-job', icon: Briefcase },
     { name: 'Applicants', path: '/company/applicants', icon: Users },
+    { name: 'Profile', path: '/company/profile', icon: User },
   ];
 
   const studentNav = [
